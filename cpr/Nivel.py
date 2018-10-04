@@ -20,6 +20,8 @@ from reportlab.lib.units import inch
 from matplotlib.patches import Polygon
 from matplotlib.collections import PatchCollection
 from cpr.SqlDb import SqlDb
+from radar import radar
+
 # default config
 typColor = '#%02x%02x%02x' % (8,31,45)
 plt.rc('axes',labelcolor=typColor)
@@ -2216,3 +2218,81 @@ class Nivel(SqlDb,wmf.SimuBasin):
         query = query.replace("'nan'",'NULL')
         query += ' ON DUPLICATE KEY UPDATE profundidad = VALUES(profundidad)'
         self.execute_sql(query)
+
+    def reflectividad_to_rain(self,start=None,end=None,verbose = None,a_yuter=15,b_yuter=30,metodo = 'yuter',extrapol=False,**kwargs):
+        '''
+        Converts radar raw data to rain intensity
+        Parameters
+        ----------
+        kwargs   :   start,end (window to generate rain nc files),rutaRadar,rutaNC
+        Returns
+        ----------
+        radar rain .nc
+        '''
+        dateText = datetime.datetime.now().strftime('%Y%m%d%H%M')
+        if start is None:
+            start =  datetime.datetime.now() + datetime.timedelta(hours = 5) - datetime.timedelta(minutes = 15)
+            end =  datetime.datetime.now() + datetime.timedelta(hours = 5) + datetime.timedelta(minutes = 15)
+        else:
+            start = pd.to_datetime(start)
+            end = pd.to_datetime(end)
+        hora1 = start.strftime('%H:%M')
+        hora2  = end.strftime('%H:%M')
+        rutaRadar = kwargs.get('rutaRadar',self.data_path + 'radar/')
+        rutaNC = kwargs.get('rutaNC',self.data_path + '101_RadarClass/')
+        #Si tiene que revisar en las carpetas de radar lo hace
+        if extrapol == False:
+            datesDias = pd.date_range(start,end,freq='D')
+            a = pd.Series(np.zeros(len(datesDias)),index=datesDias)
+            a = a.resample('A').sum()
+            Anos = [i.strftime('%Y') for i in a.index.to_pydatetime()]
+
+            datesDias = [d.strftime('%Y%m%d') for d in datesDias.to_pydatetime()]
+
+            ListDays = []
+            ListRutas = []
+            for d in datesDias:
+                    try:
+                        L = os.listdir(rutaRadar+d)
+                        L = [l for l in L if any(map(l.startswith,Anos)) and l.endswith('010_120.bin')]
+                        ListDays.extend(L)
+                        Ruta = [rutaRadar+d+'/'+l for l in L if any(map(l.startswith,Anos)) and l.endswith('010_120.bin')]
+                        ListRutas.extend(Ruta)
+                    except:
+                        pass
+            ListDays.sort()
+            ListRutas.sort()
+            ListRutasFin = []
+            # Obtiene la ruta final teniendo en cuenta la ruta del dia en las carpetas de radar
+            for j,i in zip(ListRutas, ListDays):
+                d = datetime.datetime.strptime(i[:-12],'%Y%m%d%H%M')
+                if d >= start and d<= end:
+                    ListRutasFin.append(j)
+        #Si es extrapolacion no tiene que revisar en las carpetas de radar
+        else:
+            ListRutasFin = os.listdir(rutaRadar)
+            ListRutasFin.sort()
+            ListRutasFin = [rutaRadar + i for i in ListRutasFin]
+        #CONVERSION, CLASIFICACION Y GUARDADO
+        #Carga la cuenca del AMVA
+        Niter = len(ListRutasFin)
+        Conv = np.zeros(Niter)
+        Stra = np.zeros(Niter)
+        Total = np.zeros(Niter)
+        rad = radar.radar_process()
+        for c,l in enumerate(ListRutasFin):
+            Total[c] = 0
+            Conv[c] = 0
+            Stra[c] = 0
+            rad.read_bin(l)
+            rad.Class2ConvStratiform(metodo=metodo, b_yuter = b_yuter, a_yuter = a_yuter)
+            rad.DBZ2Rain()
+            #Obtiene la ref media
+            Conv[c] = rad.Z[rad.ConvStra == 2].sum() / 1e6
+            Stra[c] = rad.Z[rad.ConvStra == 1].sum() / 1e6
+            #guarda
+            if extrapol == False:
+                rad.save_rain_class(rutaNC+l[-24:-3]+'nc')
+            else:
+                rad.save_rain_class(rutaNC+l[-24:-4]+'_extrapol.nc')
+            Total[c] = Conv[c] + Stra[c]
