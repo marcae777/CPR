@@ -12,7 +12,6 @@ import datetime
 from sqlalchemy import create_engine
 import mysql.connector
 import locale
-locale.setlocale(locale.LC_TIME, 'es_ES.UTF-8')
 
 class SqlDb:
     '''
@@ -206,3 +205,46 @@ class SqlDb:
         '''
         mins = date.minute - (date.minute % round_mins)
         return datetime.datetime(date.year, date.month, date.day, date.hour, mins) + datetime.timedelta(minutes=round_mins)
+
+
+    def duplicate_existing_table(self,table_name):
+        '''
+        Reads table properties and converts it into a create table statement
+        for further insert into a different database
+        Parameters
+        ----------
+        table_name   = SQL db table name
+        Returns
+        -------
+        Sql sentence,str
+        '''
+        df = self.read_sql('describe %s'%table_name)
+        df['Null'][df['Null']=='NO'] = 'NOT NULL'
+        df['Null'][df['Null']=='YES'] = 'NULL'
+        sentence = 'CREATE TABLE %s '%table_name
+        if df[df['Extra']=='auto_increment'].empty:
+            pk = None
+        else:
+            pk = df[df['Extra']=='auto_increment']['Field'].values[0]
+        for id,serie in df.iterrows():
+            if (serie.Default=='0') or (serie.Default is None):
+                row = '%s %s %s'%(serie.Field,serie.Type,serie.Null)
+            else:
+                if (serie.Default == 'CURRENT_TIMESTAMP'):
+                    serie.Default = "DEFAULT %s"%serie.Default
+                elif serie.Default == '0000-00-00':
+                    serie.Default = "DEFAULT '1000-01-01 00:00:00'"
+                else:
+                    serie.Default = "DEFAULT '%s'"%serie.Default
+                row = '%s %s %s %s'%(serie.Field,serie.Type,serie.Null,serie.Default)
+            if serie.Extra:
+                row += ' %s,'%serie.Extra
+            else:
+                row += ','
+            sentence+=row
+        if pk:
+            sentence +='PRIMARY KEY (%s)'%pk
+        else:
+            sentence = sentence[:-1]
+        sentence +=');'
+        return sentence

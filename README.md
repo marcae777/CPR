@@ -50,6 +50,13 @@ Dudas sobre el codigo, y sugerencias:
 - Reporte de bugs y problemas favor escribirlos en: https://github.com/SIATAhidro/CPR/issues
 
 ## Instalar las siguientes dependencias
-sudo pip install mysql-connector-python
-sudo pip install SQLAlchemy
-sudo pip install reportlab
+sudo pip3 install mysql-connector-python
+sudo pip3 install SQLAlchemy
+sudo pip3 install reportlab
+
+# para python 3
+sudo pip3 install matplotlib==2.2.3
+sudo apt install python3-mpltoolkits.basemap
+sudo pip3 install rasterio
+sudo pip3 install netCDF4
+sudo pip3 install deap

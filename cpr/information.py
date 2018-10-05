@@ -139,5 +139,5 @@ GEOPARAMETERS = {
 
 #DATA_PATH  = '/media/nicolas/maso/Mario/'
 #RADAR_PATH = '/media/nicolas/Home/nicolas/101_RadarClass/'
-RADAR_PATH = '/home/mcano/Dev/cprweb/src/media/radar_rain/'
-DATA_PATH  = '/home/mcano/Dev/cprweb/src/media/'
+RADAR_PATH = '/home/mcano/dev/cprweb/src/media/radar_rain/'
+DATA_PATH  = '/home/mcano/dev/cprweb/src/media/'

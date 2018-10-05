@@ -18,7 +18,7 @@ import matplotlib.dates as mdates
 from reportlab.lib.pagesizes import letter
 from reportlab.lib.units import inch
 from matplotlib.patches import Polygon
-
+from matplotlib.collections import PatchCollection
 from cpr.SqlDb import SqlDb
 # default config
 typColor = '#%02x%02x%02x' % (8,31,45)
@@ -27,6 +27,34 @@ plt.rc('axes',edgecolor=typColor)
 plt.rc('text',color= typColor)
 plt.rc('xtick',color=typColor)
 plt.rc('ytick',color=typColor)
+
+
+def logger(orig_func):
+    '''logging decorator, alters function passed as argument and creates
+    log file. (contains function time execution)
+    Parameters
+    ----------
+    orig_func : function to pass into decorator
+    filepath  : file to save log file (ends with .log)
+    Returns
+    -------
+    log file
+    '''
+    import logging
+    from functools import wraps
+    import time
+    logging.basicConfig(filename = info.DATA_PATH + 'logs/nivel.log',level=logging.INFO)
+    @wraps(orig_func)
+    def wrapper(*args,**kwargs):
+        start = time.time()
+        f = orig_func(*args,**kwargs)
+        date = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+        took = time.time()-start
+        log = '%s:%s:%.1f sec'%(date,orig_func.__name__,took)
+        print(log)
+        logging.info(log)
+        return f
+    return wrapper
 
 class Nivel(SqlDb,wmf.SimuBasin):
     ''' Provide functions to manipulate data related to a level sensor and its basin '''
@@ -81,8 +109,8 @@ class Nivel(SqlDb,wmf.SimuBasin):
         query = "SELECT * FROM %s WHERE clase ='Nivel'"%(self.local_table)
         return self.read_sql(query).set_index('codigo')
 
-    @staticmethod
-    def get_radar_rain(start,end,cuenca,rutaNc,rutaRes,dt,umbral,verbose,super_verbose,old,save_class,save_escenarios,store_true,**kwargs):
+    @logger
+    def get_radar_rain(self,start,end,cuenca,rutaNc,rutaRes,dt,umbral,verbose,super_verbose,old,save_class,save_escenarios,store_true,*args,**kwargs):
         '''
         Gets full information from all stations
         Returns
@@ -247,7 +275,7 @@ class Nivel(SqlDb,wmf.SimuBasin):
         pandas time Series with mean radar rain
         '''
         s =  pd.read_csv(path,skiprows=5,usecols=[2,3]).set_index(' Fecha ')[' Lluvia']
-        s.index = pd.to_datetime(map(lambda x:x.strip()[:10]+' '+x.strip()[11:],s.index))
+        s.index = pd.to_datetime(s.index)
         return s
 
     @staticmethod
@@ -264,7 +292,7 @@ class Nivel(SqlDb,wmf.SimuBasin):
         if path.endswith('.hdr') != True:
             path = path+'.hdr'
         df = pd.read_csv(path,skiprows=5).set_index(' Fecha ')
-        df.index = pd.to_datetime(map(lambda x:x.strip()[:10]+' '+x.strip()[11:],df.index))
+        df.index = pd.to_datetime(df.index)
         df = df.drop('IDfecha',axis=1)
         df.columns = ['record','mean_rain']
         return df
@@ -581,7 +609,7 @@ class Nivel(SqlDb,wmf.SimuBasin):
             flag = j
         df = pd.DataFrame(np.matrix(nlev),columns=['x','y'],index=ids)
         dfs = []
-        for i in np.arange(1,100,2)[:intCount/2]:
+        for i in np.arange(1,100,2)[:int(intCount/2)]:
             dfs.append(df.loc['Point %s'%i:'Point %s'%(i+1)])
         return dfs
 
@@ -728,7 +756,7 @@ class Nivel(SqlDb,wmf.SimuBasin):
         scale_factor =  ((255-0.)/(lev.max() - lev.min()))
         new_Limits = list(np.array(np.round((lev-lev.min())*\
                                     scale_factor/255.,3),dtype = float))
-        Custom_Color = map(lambda x: tuple(ti/255. for ti in x) , bar_colors)
+        Custom_Color = list(map(lambda x: tuple(ti/255. for ti in x) , bar_colors))
         nueva_tupla = [((new_Limits[i]),Custom_Color[i],) for i in range(len(Custom_Color))]
         cmap_radar =colors.LinearSegmentedColormap.from_list('RADAR',nueva_tupla)
         levels_nuevos = np.linspace(np.min(lev),np.max(lev),255)
@@ -767,6 +795,7 @@ class Nivel(SqlDb,wmf.SimuBasin):
         -------
         riskLevel : float. Nivel de riesgo
         '''
+        import math
         if math.isnan(value):
             return np.NaN
         else:
@@ -818,7 +847,7 @@ class Nivel(SqlDb,wmf.SimuBasin):
                 df[codigo] = np.NaN
         return df
 
-    def plot_basin_rain(self,vec,cbar=None,ax=None):
+    def plot_basin_rain(self,vec,cbar=None,ax=None,**kwargs):
         '''
         Gets last topo-batimetry in db
         Parameters
@@ -848,8 +877,10 @@ class Nivel(SqlDb,wmf.SimuBasin):
             cbar = mapa.colorbar(contour,location='right',pad="15%")
             cbar.remove()
             plt.draw()
-        mapa.readshapefile(self.info.net_path,'net_path')
-        mapa.readshapefile(self.info.stream_path,'stream_path',linewidth=1)
+        net_path = kwargs.get('net_path',self.data_path + "shapes/net/%s/%s"%(self.codigo,self.codigo))
+        stream_path = kwargs.get('stream_path',self.data_path + "shapes/stream/%s/%s"%(self.codigo,self.codigo))
+        mapa.readshapefile(net_path,'net_path')
+        mapa.readshapefile(stream_path,'stream_path',linewidth=1)
         return mapa
 
     def plot_section(self,df,*args,**kwargs):
@@ -1163,7 +1194,7 @@ class Nivel(SqlDb,wmf.SimuBasin):
             text = u'ESTACIÓN SIN DATOS TEMPORALMENTE'
 
         ax4=fig.add_subplot(413)
-        img=plt.imread('/media/nicolas/Home/Jupyter/Sebastian/git/CPR/cprv1/leyenda.png')
+        img=plt.imread(self.data_path+'tools/leyenda.png')
         im=ax4.imshow(img)
         pos=im.axes.get_position()
         im.axes.set_position((pos.x0-.026,pos.y0-.17,pos.x1-.026,pos.y1-.17))
@@ -1433,7 +1464,7 @@ class Nivel(SqlDb,wmf.SimuBasin):
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
         from reportlab.pdfgen import canvas
-        avenir_book_path = self.data_path + 'AvenirLTStd-Book.ttf'
+        avenir_book_path = self.data_path + 'tools/AvenirLTStd-Book.ttf'
         pdfmetrics.registerFont(TTFont('AvenirBook', avenir_book_path))
         current_vect_title = 'Lluvia acumulada en la cuenca en las últimas dos horas'
         # REPORLAB
@@ -1529,6 +1560,7 @@ class Nivel(SqlDb,wmf.SimuBasin):
         ----------
         last topo-batimetry in db, DataFrame
         '''
+        df = df.copy()
         for codigo in df.columns:
             risk_levels = np.array(self.infost.loc[codigo,['n1','n2','n3','n4']])
             try:
@@ -1604,7 +1636,7 @@ class Nivel(SqlDb,wmf.SimuBasin):
         df = pd.DataFrame(index = pd.date_range(start,end,freq='5min'),columns = codigos)
         for codigo in codigos:
             try:
-                level = Nivel(codigo=codigo,** info.LOCAL).level(start,end,**kwargs).resample('5min').mean()
+                level = Nivel(codigo=codigo,** info.LOCAL).level(start,end,**kwargs).resample('5min').max()
                 df[codigo] = level
             except:
                 pass
@@ -1721,6 +1753,7 @@ class Nivel(SqlDb,wmf.SimuBasin):
                 risk[codigo] = 'black'
         return risk
 
+    @logger
     def reporte_lluvia(self,end,filepath=None):
         '''
         Gets last topo-batimetry in db
@@ -1837,6 +1870,7 @@ class Nivel(SqlDb,wmf.SimuBasin):
         for tick in ax.get_xticklabels():
             tick.set_rotation(90)
 
+    @logger
     def reporte_diario(self,date):
         '''
         Gets last topo-batimetry in db
@@ -1960,6 +1994,7 @@ class Nivel(SqlDb,wmf.SimuBasin):
         query = "rsync -r %s %s/"%(folder_path+'/lluvia_diaria.png',remote_path+end.strftime('%Y%m%d'))
         os.system(query)
 
+    @logger
     def gif(self,start,end,delay=0,loop=0):
         '''
         Gets last topo-batimetry in db
@@ -2106,3 +2141,78 @@ class Nivel(SqlDb,wmf.SimuBasin):
         new_index = pd.date_range(start,end,freq='min')
         series = df.reindex(new_index)[field]
         return series
+
+    def siata_remote_data_to_transfer(start,end,*args,**kwargs):
+        '''
+        Parameters
+        ----------
+        start        : initial date
+        end          : final date
+        Returns
+        ----------
+        pandas DataFrame
+        '''
+        remote = cpr.Nivel(**cpr.info.REMOTE)
+        codigos_str = '('+str(list(self.infost.index)).strip('[]')+')'
+        parameters = tuple([codigos_str,self.fecha_hora_query(start,end)])
+        df = remote.read_sql('SELECT * FROM datos WHERE cliente in %s and %s'%parameters)
+        return df
+
+    def data_to_transfer(self,start,end,local_path=None,remote_path=None,**kwargs):
+        '''
+        Gets pandas Series with data from tables with
+        bad data
+        Parameters
+        ----------
+        field        : Sql table field name
+        start        : initial date
+        end          : final date
+        Returns
+        ----------
+        pandas time Series
+        '''
+        transfer = self.siata_remote_data_to_transfer(start,end,**kwargs)
+        def convert(x):
+            try:
+                value = pd.to_datetime(x).strftime('%Y-%m-%d')
+            except:
+                value = np.NaN
+            return value
+        transfer['fecha'] = transfer['fecha'].apply(lambda x:convert(x))
+        transfer = transfer.loc[transfer['fecha'].dropna().index]
+        if local_path:
+            transfer.to_csv(local_path)
+            if remote_path:
+                os.system('scp %s %s'%(local_path,remote_path))
+        return transfer
+
+    @logger
+    def insert_myusers_hydrodata(self,start,end):
+        '''
+        Inserts data into myusers_hydrodata table, if fecha and fk_id exist, updates values.
+        bad data
+        Parameters
+        ----------
+        start        : initial date
+        end          : final date
+        Returns
+        ----------
+        pandas time Series
+        '''
+        df = self.level_all(start,end,calidad=True)
+        query = "INSERT INTO myusers_hydrodata (fk_id,fecha,profundidad,timestamp,updated,user_id) VALUES "
+        df = df.unstack().reset_index()
+        df.columns = ['fk_id','fecha','profundidad']
+        df['profundidad'] = df['profundidad']
+        df['fk_id'] = self.infost.loc[np.array(df['fk_id'].values,int),'id'].values
+        df['profundidad'] = df['profundidad'].apply(lambda x:round(x,3))
+        df = df.applymap(lambda x:str(x))
+        df['timestap'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+        df['updated'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
+        df['user_id'] = '1'
+        for id,s in df.iterrows():
+            query+=('('+str(list(s.values)).strip('[]'))+'), '
+        query = query[:-2]
+        query = query.replace("'nan'",'NULL')
+        query += ' ON DUPLICATE KEY UPDATE profundidad = VALUES(profundidad)'
+        self.execute_sql(query)
