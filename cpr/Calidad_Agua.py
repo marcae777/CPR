@@ -1,12 +1,15 @@
-#!/usr/bin/env python
+#!/usr/bin//env python
 # -*- coding: utf-8 -*-
 #
 #
 #  Copyright 2018 Sebastián Ospina <seospina@gmail.com>
 from cpr.Nivel import Nivel
+from cpr.SqlDb import SqlDb
+import matplotlib.pyplot as plt
 import pandas as pd
 import numpy as np
 import cpr.information as info
+import matplotlib.dates as mdates
 
 def logger(orig_func):
     '''logging decorator, alters function passed as argument and creates
@@ -58,10 +61,9 @@ class Calidad_Agua(Nivel):
         import os
         import matplotlib.font_manager as fm
 
-        self.remote_server = info.REMOTE_CALIDAD_AGUA
-
         if remote:
-            kwargs = self.remote_server
+            kwargs = info.REMOTE_CALIDAD_AGUA
+            info.REMOTE = info.REMOTE_CALIDAD_AGUA
         else:
             kwargs = info.LOCAL
 
@@ -70,7 +72,8 @@ class Calidad_Agua(Nivel):
         self.rain_path = info.DATA_PATH_CALIDAD_AGUA + 'user_output/radar/'
         self.radar_path = info.RADAR_PATH
 
-        Nivel.__init__(self, codigo = codigo_nivel,**kwargs)
+        SqlDb.__init__(self,codigo=codigo_calidad,**kwargs)
+        self.nivel = Nivel(codigo = codigo_nivel,**kwargs)
 
         if SimuBasin:
             try:
@@ -85,7 +88,7 @@ class Calidad_Agua(Nivel):
                              (39 /255., 165/255.,132/255.),(139/255., 187/255.,116/255.),\
                              (200/255., 209/255., 93/255.),(249/255., 230/255., 57/255.)]
 
-        font_path='/media/nicolas/Home/Jupyter/Sebastian/AvenirLTStd-Book/AvenirLTStd-Book.otf'
+        font_path=info.DATA_PATH+'tools/AvenirLTStd-Book.otf'
 
         if os.path.isfile(font_path):
             self.fontype=fm.FontProperties(fname=font_path)
@@ -93,6 +96,7 @@ class Calidad_Agua(Nivel):
             self.legendfont=self.fontype
             self.legendfont.set_size(12)
         else:
+            self.fontype=fm.FontProperties(fname=font_path)
             fonts=[i for i in matplotlib.font_manager.findSystemFonts() if ('free' in i.lower())&('sans' in i.lower())]
             self.fontype=fm.FontProperties(fname=fonts[0])
 
@@ -188,7 +192,7 @@ class Calidad_Agua(Nivel):
         ----------
         pandas DataFrame
         '''
-        sql = SqlDb(codigo = self.codigo_calidad,**self.remote_server)
+        sql = SqlDb(codigo = self.codigo_calidad,**info.REMOTE_CALIDAD_AGUA)
         start=pd.to_datetime(start).strftime('%Y-%m-%d %H:%M:00')
         end=pd.to_datetime(end).strftime('%Y-%m-%d %H:%M:00')
         s = sql.read_sql('select fecha_hora,ce,do,ph,orp,t,calidad from calidad_agua where fecha_hora between "%s" and "%s" order by fecha_hora'%(start,end)).set_index('fecha_hora')
@@ -206,7 +210,7 @@ class Calidad_Agua(Nivel):
         ----------
         pandas time series
         '''
-        sql = SqlDb(codigo = self.codigo_calidad,**self.remote_server)
+        sql = SqlDb(codigo = self.codigo_calidad,**info.REMOTE_CALIDAD_AGUA)
         start=pd.to_datetime(start).strftime('%Y-%m-%d %H:%M:00')
         end=pd.to_datetime(end).strftime('%Y-%m-%d %H:%M:00')
         s = sql.read_sql('select fecha_hora,%s from calidad_agua where fecha_hora between "%s" and "%s" and calidad in (1,2) order by fecha_hora'%(variable,start,end)).set_index('fecha_hora')
@@ -255,7 +259,7 @@ class Calidad_Agua(Nivel):
             ax.set_yticks(yticks)
             ax.set_yticklabels(yticks,fontproperties=self.fontype,fontsize=15)
 
-        xticks=series[::n/6].index
+        xticks=series[::n//6].index
 
         ax.set_xticks(xticks)
         ax.set_xticklabels(xticks.strftime('%Y-%m-%d'),fontproperties=self.fontype,fontsize=15)
@@ -321,7 +325,7 @@ class Calidad_Agua(Nivel):
         ax.set_ylim(0,mx*1.3)
         ax.set_xlim(grouped.index[0]-self.parse_time('1'+grouper[-1]),grouped.index[-1]+self.parse_time('1'+grouper[-1]))
 
-        xticks=grouped[::max(1,n/11)].index
+        xticks=grouped[::max(1,n//11)].index
         yticks=[round(x) for x in np.linspace(0,mx*1.3,6)]
 
         ax.set_xticks(xticks)
@@ -507,7 +511,7 @@ class Calidad_Agua(Nivel):
         rute_shapes = '/media/nicolas/maso/calidad_agua/shapes'
         paths = {'stream_path':'%s/streams/%s'%(rute_shapes,self.slug),
                 'net_path' : '%s/net/%s'%(rute_shapes,self.slug),
-                'polygon_path' : '%s/polygon/%s'%(rute_shapes,self.slug)}
+                'polygon_path' : '%s/polygon//%s'%(rute_shapes,self.slug)}
 
         for path in paths.values():
             os.system('mkdir %s'%path)
