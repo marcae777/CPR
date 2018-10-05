@@ -400,10 +400,10 @@ class Nivel(SqlDb,wmf.SimuBasin):
                         file =  file[:file.find('.')]
                         if (file+'.bin' in files) and (file+'.hdr' in files):
                             break
-                        else:   
-                            pt = self.rain_path + file + ext 
-                            os.remove(str(pt)) 
-                            file = None                                             
+                        else:
+                            pt = self.rain_path + file + ext
+                            os.remove(str(pt))
+                            file = None
                     else:
                         file = None
                 except:
@@ -545,39 +545,10 @@ class Nivel(SqlDb,wmf.SimuBasin):
         conn_db.close()
         return data
 
-    def last_bat(self,x_sensor):
-        '''
-        Gets last topo-batimetry in db
-        Parameters
-        ----------
-        x_sensor   :   x location of sensor or point to adjust topo-batimetry
-        Returns
-        ----------
-        last topo-batimetry in db, DataFrame
-        '''
-        obj = Nivel(**info.REMOTE)
-        dfl = obj.mysql_query('select * from levantamiento_aforo_nueva')
-        dfl.columns = obj.mysql_query('describe levantamiento_aforo_nueva')[0].values
-        dfl = dfl.set_index('id_aforo')
-        for id_aforo in list(set(dfl.index)):
-            id_estacion_asociada,fecha = obj.mysql_query("SELECT id_estacion_asociada,fecha from aforo_nueva where id_aforo = %s"%id_aforo,toPandas=False)[0]
-            dfl.loc[id_aforo,'id_estacion_asociada'] = int(id_estacion_asociada)
-            dfl.loc[id_aforo,'fecha'] = fecha
-        dfl = dfl.reset_index().set_index('id_estacion_asociada')
-        lev = dfl[dfl['fecha']==max(list(set(pd.to_datetime(dfl.loc[self.codigo,'fecha'].values))))][['x','y']].astype('float')
-        cond = (lev['x']<x_sensor).values
-        flag = cond[0]
-        for i,j in enumerate(cond):
-            if j==flag:
-                pass
-            else:
-                point = (tuple(lev.iloc[i-1].values),tuple(lev.iloc[i].values))
-            flag = j
-        intersection = self.line_intersection(point,((x_sensor,0.1*lev['y'].min()),(x_sensor,1.1*lev['y'].max(),(x_sensor,))))
-        lev = lev.append(pd.DataFrame(np.matrix(intersection),index=['x_sensor'],columns=['x','y'])).sort_values('x')
-        lev['y'] = lev['y']-intersection[1]
-        lev.index = range(1,lev.index.size+1)
-        return lev
+    def last_topo(self):
+        fk_id = self.read_sql("SELECT id,fecha from myusers_item where item_fk_id = '%s'"%self.info.id).sort_values('fecha').loc[0,'id']
+        last_bat = self.read_sql('SELECT * FROM myusers_topo where fk_id = "%s"'%fk_id)
+        return last_bat
 
     def get_sections(self,levantamiento,level):
         '''
