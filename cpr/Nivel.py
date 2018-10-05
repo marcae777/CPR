@@ -394,8 +394,14 @@ class Nivel(SqlDb,wmf.SimuBasin):
                 try:
                     comienza,finaliza,codigo,usuario = self.file_format_to_variables(file)
                     if (comienza<=start) and (finaliza>=end) and (codigo==self.codigo):
+                        ext = file[file.find('.'):]
                         file =  file[:file.find('.')]
-                        break
+                        if (file+'.bin' in files) and (file+'.hdr' in files):
+                            break
+                        else:   
+                            pt = self.rain_path + file + ext 
+                            os.remove(str(pt)) 
+                            file = None                                             
                     else:
                         file = None
                 except:
