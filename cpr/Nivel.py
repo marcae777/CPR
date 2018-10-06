@@ -488,7 +488,7 @@ class Nivel(SqlDb,wmf.SimuBasin):
         s = self.fecha_hora_format_data(['pr','NI'][self.info.tipo_sensor],start,end,**kwargs)
         return s
 
-    def level(self,start,end,offset='new',**kwargs):
+    def level(self,start=None,end=None,codigos=None,hours=3,local=False,**kwargs):
         '''
         Reads remote level data
         Parameters
@@ -499,15 +499,29 @@ class Nivel(SqlDb,wmf.SimuBasin):
         ----------
         pandas DataFrame with datetime index and basin radar fields
         '''
-        s = self.sensor(start,end,**kwargs)
-        if offset == 'new':
-            serie = self.info.offset - s
-            serie[serie>=self.info.offset_old] = np.NaN
+        if start:
+            start = pd.to_datetime(start)
+            end   = pd.to_datetime(end)
         else:
-            serie = self.info.offset_old - s
-            serie[serie>=self.info.offset_old] = np.NaN
-        serie[serie<=0.0] = np.NaN
-        return serie
+            end = self.round_time()
+            start = end - datetime.timedelta(hours = hours)
+        if local:
+            if codigos:
+                return self.level_all(start,end,codigos=codigos,local=local)
+            else:
+                format = (self.info.id,start.strftime(self.date_format),end.strftime(self.date_format))
+                query = "SELECT fecha,profundidad FROM myusers_hydrodata where fk_id = '%s' and fecha between '%s' and '%s'"%format
+                return self.read_sql(query).set_index('fecha')['profundidad']
+        else:
+            calidad = kwargs.get('calidad',True)
+            if codigos:
+                return self.level_all(start,end,codigos=codigos,calidad=calidad)
+            else:
+                s = self.sensor(start,end,calidad=calidad)
+                serie = self.info.offset - s
+                serie[serie>=self.info.offset_old] = np.NaN
+                serie[serie<=0.0] = np.NaN
+                return serie
 
     def offset_remote(self):
         '''
@@ -1494,27 +1508,6 @@ class Nivel(SqlDb,wmf.SimuBasin):
         pdf.showPage()
         pdf.save()
 
-    def level_local_all(self,start,end):
-        '''
-        Gets last topo-batimetry in db
-        Parameters
-        ----------
-        x_sensor   :   x location of sensor or point to adjust topo-batimetry
-        Returns
-        ----------
-        last topo-batimetry in db, DataFrame
-        '''
-        start,end = (start.strftime('%Y-%m-%d %H:%M'),end.strftime('%Y-%m-%d %H:%M'))
-        query = "select codigo,fecha,profundidad from myusers_hydrodata where fecha between '%s' and '%s'"%(start,end)
-        df = self.read_sql(query).set_index('codigo').loc[self.infost.index].set_index('fecha',append=True)
-        codigos = df.index.levels[0]
-        nivel = df.reset_index('fecha').loc[codigos,'nivel']
-        df = df.reset_index('fecha')
-        df['nivel'] = self.infost.loc[df.index,'offset']-df['nivel']
-        df = df.set_index('fecha',append=True)
-        df[df<0.0] = np.NaN
-        return df.unstack(0)['nivel']
-
     def make_rain_report_current(self,codigos):
         '''
         Gets last topo-batimetry in db
@@ -1595,7 +1588,7 @@ class Nivel(SqlDb,wmf.SimuBasin):
         alpha=1
         height = 8
 
-    def level_all(self,start=None,end = None,hours=3,**kwargs):
+    def level_all(self,start=None,end = None,codigos=None,hours=3,local=False,**kwargs):
         '''
         Gets last topo-batimetry in db
         Parameters
@@ -1605,21 +1598,24 @@ class Nivel(SqlDb,wmf.SimuBasin):
         ----------
         last topo-batimetry in db, DataFrame
         '''
-        if start:
-            start = self.round_time(pd.to_datetime(start))
-            end   = self.round_time(pd.to_datetime(end))
-        else:
-            end = pd.to_datetime(self.round_time())
-            start = end - datetime.timedelta(hours = hours)
         codigos = kwargs.get('codigos',self.infost.index)
-        df = pd.DataFrame(index = pd.date_range(start,end,freq='5min'),columns = codigos)
-        for codigo in codigos:
-            try:
-                level = Nivel(codigo=codigo,** info.LOCAL).level(start,end,**kwargs).resample('5min').max()
-                df[codigo] = level
-            except:
-                pass
-        return df
+        if local:
+            fields = 'estaciones_estaciones.codigo,myusers_hydrodata.fecha,myusers_hydrodata.profundidad'
+            join = 'estaciones_estaciones ON myusers_hydrodata.fk_id = estaciones_estaciones.id'
+            format = (fields,join,start.strftime(self.date_format),end.strftime(self.date_format))
+            query = "SELECT %s FROM myusers_hydrodata INNER JOIN %s WHERE myusers_hydrodata.fecha between '%s' and '%s' "%format
+            df = self.read_sql(query).set_index(['codigo','fecha']).unstack(0)['profundidad']
+            return df[codigos]
+        else:
+            start = self.round_time(start)
+            df = pd.DataFrame(index = pd.date_range(start,end,freq='1min'),columns = codigos)
+            for codigo in codigos:
+                try:
+                    level = Nivel(codigo=codigo,** info.LOCAL).level(start,end,**kwargs)
+                    df[codigo] = level
+                except:
+                    pass
+            return df
 
     def make_risk_report_current(self,df):
         '''
@@ -2166,7 +2162,7 @@ class Nivel(SqlDb,wmf.SimuBasin):
         return transfer
 
     @logger
-    def insert_myusers_hydrodata(self,start,end):
+    def insert_myusers_hydrodata(self,start=None,end=None,df=None):
         '''
         Inserts data into myusers_hydrodata table, if fecha and fk_id exist, updates values.
         bad data
@@ -2178,7 +2174,10 @@ class Nivel(SqlDb,wmf.SimuBasin):
         ----------
         pandas time Series
         '''
-        df = self.level_all(start,end,calidad=True)
+        if df is None:
+            df = self.level_all(start,end,calidad=True)
+        else:
+            df = df.copy()
         query = "INSERT INTO myusers_hydrodata (fk_id,fecha,profundidad,timestamp,updated,user_id) VALUES "
         df = df.unstack().reset_index()
         df.columns = ['fk_id','fecha','profundidad']
