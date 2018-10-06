@@ -1599,6 +1599,12 @@ class Nivel(SqlDb,wmf.SimuBasin):
         ----------
         last topo-batimetry in db, DataFrame
         '''
+        if start:
+            start = pd.to_datetime(start)
+            end   = pd.to_datetime(end)
+        else:
+            end = self.round_time()
+            start = end - datetime.timedelta(hours = hours)
         codigos = kwargs.get('codigos',self.infost.index)
         if local:
             fields = 'estaciones_estaciones.codigo,myusers_hydrodata.fecha,myusers_hydrodata.profundidad'
@@ -1608,7 +1614,7 @@ class Nivel(SqlDb,wmf.SimuBasin):
             df = self.read_sql(query).set_index(['codigo','fecha']).unstack(0)['profundidad']
             return df[codigos]
         else:
-            start = self.round_time(start)
+            start = self.round_time(pd.to_datetime(start))
             df = pd.DataFrame(index = pd.date_range(start,end,freq='1min'),columns = codigos)
             for codigo in codigos:
                 try:
@@ -1653,7 +1659,7 @@ class Nivel(SqlDb,wmf.SimuBasin):
         def convert_to_risk(df):
             df = self.risk_df(df)
             return df[df.columns.dropna()]
-        self.make_risk_report_current(convert_to_risk(self.level_all()))
+        self.make_risk_report_current(convert_to_risk(self.level_all().resample('5min').max()))
 
     def rain_area_metropol(self,vec,ax,f=1):
         '''
