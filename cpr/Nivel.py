@@ -495,6 +495,7 @@ class Nivel(SqlDb,wmf.SimuBasin):
         ----------
         start        : initial date
         end          : final date
+        codigos      : stations to make dataframe with sensor data, if none, returns time Series
         Returns
         ----------
         pandas DataFrame with datetime index and basin radar fields
