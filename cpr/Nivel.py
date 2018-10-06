@@ -508,7 +508,7 @@ class Nivel(SqlDb,wmf.SimuBasin):
             start = end - datetime.timedelta(hours = hours)
         if local:
             if codigos:
-                return self.level_all(start,end,codigos=codigos,local=local)
+                return self.level_all(start,end,codigos,local=local)
             else:
                 format = (self.info.id,start.strftime(self.date_format),end.strftime(self.date_format))
                 query = "SELECT fecha,profundidad FROM myusers_hydrodata where fk_id = '%s' and fecha between '%s' and '%s'"%format
@@ -516,7 +516,7 @@ class Nivel(SqlDb,wmf.SimuBasin):
         else:
             calidad = kwargs.get('calidad',True)
             if codigos:
-                return self.level_all(start,end,codigos=codigos,calidad=calidad)
+                return self.level_all(start,end,codigos,calidad=calidad)
             else:
                 s = self.sensor(start,end,calidad=calidad)
                 serie = self.info.offset - s
@@ -1605,7 +1605,8 @@ class Nivel(SqlDb,wmf.SimuBasin):
         else:
             end = self.round_time()
             start = end - datetime.timedelta(hours = hours)
-        codigos = kwargs.get('codigos',self.infost.index)
+        if codigos is None:
+            codigos = self.infost.index
         if local:
             fields = 'estaciones_estaciones.codigo,myusers_hydrodata.fecha,myusers_hydrodata.profundidad'
             join = 'estaciones_estaciones ON myusers_hydrodata.fk_id = estaciones_estaciones.id'
