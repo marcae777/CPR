@@ -757,27 +757,6 @@ class Nivel(SqlDb,wmf.SimuBasin):
         norm_new_radar = colors.BoundaryNorm(boundaries=levels_nuevos, ncolors=256)
         return cmap_radar,levels_nuevos,norm_new_radar
 
-    def level_local(self,start,end,offset='new'):
-        '''
-        Gets last topo-batimetry in db
-        Parameters
-        ----------
-        x_sensor   :   x location of sensor or point to adjust topo-batimetry
-        Returns
-        ----------
-        last topo-batimetry in db, DataFrame
-        '''
-        if offset=='new':
-            offset = self.info.offset
-        else:
-            offset = self.info.offset_old
-        format = (self.codigo,start,end)
-        query = "select fecha,profundidad from myusers_hydrodata where codigo='%s' and fecha between '%s' and '%s';"%format
-        level =  (offset - self.read_sql(query).set_index('fecha')['nivel'])
-        level[level>self.risk_levels[-1]*1.2] = np.NaN
-        level[level>offset] = np.NaN
-        return level
-
     def convert_level_to_risk(self,value,risk_levels):
         ''' Convierte lamina de agua o profundidad a nivel de riesgo
         Parameters
@@ -2170,7 +2149,7 @@ class Nivel(SqlDb,wmf.SimuBasin):
         return transfer
 
     @logger
-    def insert_myusers_hydrodata(self,start=None,end=None,df=None):
+    def insert_myusers_hydrodata(self,df,field='profundidad'):
         '''
         Inserts data into myusers_hydrodata table, if fecha and fk_id exist, updates values.
         bad data
@@ -2178,20 +2157,18 @@ class Nivel(SqlDb,wmf.SimuBasin):
         ----------
         start        : initial date
         end          : final date
+        field        : table field value to update
         Returns
         ----------
-        pandas time Series
+        pandas DataFrame
         '''
-        if df is None:
-            df = self.level_all(start,end,calidad=True)
-        else:
-            df = df.copy()
-        query = "INSERT INTO myusers_hydrodata (fk_id,fecha,profundidad,timestamp,updated,user_id) VALUES "
+        df = df.copy()
+        query = "INSERT INTO myusers_hydrodata (fk_id,fecha,%s,timestamp,updated,user_id) VALUES "%field
         df = df.unstack().reset_index()
-        df.columns = ['fk_id','fecha','profundidad']
-        df['profundidad'] = df['profundidad']
+        df.columns = ['fk_id','fecha',field]
+        df[field] = df[field]
         df['fk_id'] = self.infost.loc[np.array(df['fk_id'].values,int),'id'].values
-        df['profundidad'] = df['profundidad'].apply(lambda x:round(x,3))
+        df[field] = df[field].apply(lambda x:round(x,3))
         df = df.applymap(lambda x:str(x))
         df['timestap'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
         df['updated'] = datetime.datetime.now().strftime('%Y-%m-%d %H:%M')
@@ -2200,9 +2177,10 @@ class Nivel(SqlDb,wmf.SimuBasin):
             query+=('('+str(list(s.values)).strip('[]'))+'), '
         query = query[:-2]
         query = query.replace("'nan'",'NULL')
-        query += ' ON DUPLICATE KEY UPDATE profundidad = VALUES(profundidad)'
+        query += ' ON DUPLICATE KEY UPDATE %s = VALUES(%s)'%(field,field)
         self.execute_sql(query)
 
+    @logger
     def reflectividad_to_rain(self,start=None,end=None,verbose = None,a_yuter=15,b_yuter=30,metodo = 'yuter',extrapol=False,**kwargs):
         '''
         Converts radar raw data to rain intensity
@@ -2280,3 +2258,58 @@ class Nivel(SqlDb,wmf.SimuBasin):
             else:
                 rad.save_rain_class(rutaNC+l[-24:-4]+'_extrapol.nc')
             Total[c] = Conv[c] + Stra[c]
+
+    @logger
+    def mean_rain_masked(self,start,end,codigos=None):
+        '''
+        Converts radar raw data to rain intensity
+        Parameters
+        ----------
+        kwargs   :   start,end (window to generate rain nc files),rutaRadar,rutaNC
+        Returns
+        ----------
+        radar rain .nc
+        '''
+        gabino = Nivel(codigo=260,SimuBasin=True,**info.LOCAL)
+        rain = gabino.radar_rain(start,end)
+        rain_vect = gabino.radar_rain_vect(start,end)
+        if codigos is None:
+            codigos = gabino.infost.index
+        df = pd.DataFrame(index = rain_vect.index,columns=codigos)
+        for codigo in codigos:
+            mask_path = gabino.data_path + 'mask/mask_%s.tif'%(codigo)
+            try:
+                mask_map = wmf.read_map_raster(mask_path)
+                mask_vect = gabino.Transform_Map2Basin(mask_map[0],mask_map[1])
+            except AttributeError:
+                mask_vect = None
+                print('ERROR: %s'%codigo)
+            if mask_vect is not None:
+                mean = []
+                for date in rain_vect.index:
+                    mean.append(np.sum(mask_vect*rain_vect.loc[date])/np.sum(mask_vect))
+                if len(mean)>0:
+                    df[codigo] = mean
+        return df
+
+    def intensidad_radar(self,start,end,codigos=None,**kwargs):
+        '''
+        Converts radar raw data to rain intensity
+        Parameters
+        ----------
+        kwargs   :   start,end (window to generate rain nc files),rutaRadar,rutaNC
+        Returns
+        ----------
+        radar'''
+        start,end = pd.to_datetime(start),pd.to_datetime(end)
+        format = (self.info.id,start.strftime(self.date_format),end.strftime(self.date_format))
+        if codigos:
+            fields = 'estaciones_estaciones.codigo,myusers_hydrodata.fecha,myusers_hydrodata.intensidad_radar'
+            join = 'estaciones_estaciones ON myusers_hydrodata.fk_id = estaciones_estaciones.id'
+            format = (fields,join,start.strftime(self.date_format),end.strftime(self.date_format))
+            query = "SELECT %s FROM myusers_hydrodata INNER JOIN %s WHERE myusers_hydrodata.fecha between '%s' and '%s' "%format
+            df = self.read_sql(query).set_index(['codigo','fecha']).unstack(0)['intensidad_radar']
+            return df[codigos]
+        else:
+            query = "SELECT fecha,intensidad_radar FROM myusers_hydrodata where fk_id = '%s' and fecha between '%s' and '%s'"%format
+            return self.read_sql(query).set_index('fecha')['intensidad_radar']
