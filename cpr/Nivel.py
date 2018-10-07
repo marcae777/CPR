@@ -1960,8 +1960,8 @@ class Nivel(SqlDb,wmf.SimuBasin):
     def gif(self,start,end,delay=0,loop=0):
         '''
         Gets last topo-batimetry in db
-        Parameters
         ----------
+        Parameters
         x_sensor   :   x location of sensor or point to adjust topo-batimetry
         Returns
         ----------
@@ -2313,3 +2313,59 @@ class Nivel(SqlDb,wmf.SimuBasin):
         else:
             query = "SELECT fecha,intensidad_radar FROM myusers_hydrodata where fk_id = '%s' and fecha between '%s' and '%s'"%format
             return self.read_sql(query).set_index('fecha')['intensidad_radar']
+
+
+    def convert_series_to_risk(self,level):
+        risk = level.copy()
+        colors = ['green','gold','orange','red','red','black']
+        for codigo in level.index:
+            try:
+                risks = Nivel(codigo = codigo,**info.LOCAL).risk_levels
+                risk[codigo] = colors[int(self.convert_level_to_risk(level[codigo],risks))]
+            except:
+                risk[codigo] = 'black'
+        return risk
+
+    @logger
+    def mean_rain_report(self,start,end):
+        '''
+        Converts radar raw data to rain intensity
+        Parameters
+        ----------
+        kwargs   :   start,end (window to generate rain nc files),rutaRadar,rutaNC
+        Returns
+        ----------
+        radar'''
+        df = self.mean_rain_masked(start,end)
+        df_posterior = df.loc[end-datetime.timedelta(minutes=30):]
+        plt.rc('font', **{'size'   :16})
+        fig = plt.figure(figsize=(20,20))
+        fig.subplots_adjust(hspace=1.1)
+        ax1 = fig.add_subplot(211)
+        ax2 = fig.add_subplot(212)
+        suma = (df/1000.).sum().sort_values(ascending=False)
+        suma = suma[suma>0.0]
+        orden = np.array(suma.index,int)
+        suma.index = self.infost.loc[suma.index,'slug']
+        level = self.level_all(start,end).iloc[-3:].max()
+        risk = self.convert_series_to_risk(level)
+        dfb = pd.DataFrame(index=suma.index,columns=['rain','color'])
+        dfb['rain'] = suma.values
+        dfb['color'] = risk.loc[orden].values
+        dfb['rain'].plot.bar(color=dfb['color'].values,ax=ax1)
+        title = 'start: %s, end: %s'%(start.strftime('%Y-%m-%d %H:%M'),end.strftime('%Y-%m-%d %H:%M'))
+        filepath = '/media/nicolas/Home/Jupyter/MarioLoco/reportes/lluvia_en_cuencas.png'
+        ax1.set_title(title)
+        ax1.set_ylabel('lluvia acumulada\n promedio en la cuenca [mm]')
+        suma = (df_posterior/1000.).sum().loc[orden]
+        suma.index = self.infost.loc[suma.index,'slug']
+        dfb = pd.DataFrame(index=suma.index,columns=['rain','color'])
+        dfb['rain'] = suma.values
+        dfb['color'] = risk.loc[orden].values
+        dfb['rain'].plot.bar(color=dfb['color'].values,ax=ax2)
+        filepath = '/media/nicolas/Home/Jupyter/MarioLoco/reportes/lluvia_en_cuencas.png'
+        ax2.set_title(u'lluvia acumulada en la próxima media hora')
+        ax2.set_ylabel('lluvia acumulada\n promedio en la cuenca [mm]')
+        ax1.set_ylim(0,30)
+        ax2.set_ylim(0,30)
+        self.insert_myusers_hydrodata(df,field='intensidad_radar')
