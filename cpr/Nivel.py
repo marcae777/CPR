@@ -1626,7 +1626,7 @@ class Nivel(SqlDb,wmf.SimuBasin):
         os.system('scp %s mcano@siata.gov.co:/var/www/mario/realTime/'%filepath)
         return in_risk
 
-    def reporte_nivel(self):
+    def reporte_nivel(self,df=None):
         '''
         Gets last topo-batimetry in db
         Parameters
@@ -1636,10 +1636,14 @@ class Nivel(SqlDb,wmf.SimuBasin):
         ----------
         last topo-batimetry in db, DataFrame
         '''
+        if df is None:
+            df = self.level_all().resample('5min').max()
+        else:
+            df = df.copy()
         def convert_to_risk(df):
             df = self.risk_df(df)
             return df[df.columns.dropna()]
-        self.make_risk_report_current(convert_to_risk(self.level_all().resample('5min').max()))
+        self.make_risk_report_current(convert_to_risk(df))
 
     def rain_area_metropol(self,vec,ax,f=1):
         '''
@@ -2336,7 +2340,7 @@ class Nivel(SqlDb,wmf.SimuBasin):
         return risk
 
     @logger
-    def mean_rain_report(self,start,end):
+    def mean_rain_report(self,start,end,**kwargs):
         '''
         Converts radar raw data to rain intensity
         Parameters
@@ -2356,7 +2360,7 @@ class Nivel(SqlDb,wmf.SimuBasin):
         suma = suma[suma>0.0]
         orden = np.array(suma.index,int)
         suma.index = self.infost.loc[suma.index,'slug']
-        level = self.level_all(start,end).iloc[-3:].max()
+        level = kwargs.get('level',self.level_all(start,end).iloc[-3:].max())
         risk = self.convert_series_to_risk(level)
         dfb = pd.DataFrame(index=suma.index,columns=['rain','color'])
         dfb['rain'] = suma.values
