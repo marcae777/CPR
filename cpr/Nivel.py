@@ -4,7 +4,8 @@
 #  CRP.py
 #
 #  Copyright 2018 MCANO <mario.cano@siata.gov.co>
-
+import matplotlib
+matplotlib.use('Agg')
 import pandas as pd
 import numpy as np
 import os

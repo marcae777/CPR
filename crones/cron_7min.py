@@ -1,6 +1,8 @@
 #!/usr/bin/env python
 # -*- coding: utf-8 -*-
 #  Copyright 2018 MCANO <mario.cano@siata.gov.co>
+import matplotlib
+matplotlib.use('Agg')
 import datetime
 from cpr.Nivel import Nivel
 import cpr.information as info
