@@ -109,6 +109,10 @@ class Humedad(cprv1.SqlDb):
         self.colores_siata2 = ['#1487B9', '#22467F','#09202E','#004D56',\
                               '#70AFBA','#98D1DD','#8ABB73','#C7D15D']
         self.colores_siata_sora=['#008d8d','#3CB371']
+        
+        self.colores_random=['#1487B9','#8ABB73',' #22467F',' #C7D15D',' #004D56',' #3CB371']
+
+        self.best_color=['#C7D15D','#3CB371', '#22467F']
     @property
     def info(self):
         query = "SELECT * FROM %s WHERE clase = 'H' and codigo='%s'"%(self.local_table,self.codigo)
