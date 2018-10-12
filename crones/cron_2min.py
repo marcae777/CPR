@@ -17,7 +17,7 @@ def conversion():
     end = datetime.datetime.now()
     start = end-datetime.timedelta(minutes=15)
     end = end + datetime.timedelta(minutes=30)
-    self.reflectividad_to_rain(start,end)
+    self.reflectividad_to_rain(start,end,rutaRadar=info.REFLECTIVIDAD_PATH)
 
 if __name__ == '__main__':
     p = multiprocessing.Process(target=conversion, name="r")
