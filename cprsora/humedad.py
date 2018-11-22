@@ -7,6 +7,8 @@ import matplotlib.font_manager as fm
 # old versions, pending for change
 import cprv1 as cprv1
 from cpr import cpr
+import information as info
+
 
 import sys
 reload(sys)
@@ -91,7 +93,7 @@ class Humedad(cprv1.SqlDb):
     local_table  = 'estaciones_estaciones'
     remote_table = 'estaciones'
     
-    def __init__(self,**kwargs):
+    def __init__(self,codigo=None,**kwargs):
         '''
         The instance inherits modules to manipulate SQL
         Parameters
@@ -102,7 +104,7 @@ class Humedad(cprv1.SqlDb):
         nc_path       : path of the .nc file to set wmf class
         '''
         self.data_path ='/media/nicolas/maso/Mario/'
-        cprv1.SqlDb.__init__(self,**kwargs)
+        cprv1.SqlDb.__init__(self,**info.LOCAL)
         
         self.colores_siata = [[0.69,0.87,0.93],[0.61,0.82,0.88],[0.32,0.71,0.77],[0.21,0.60,0.65],#\
                                   [0.0156,0.486,0.556],[0.007,0.32,0.36],[0.0078,0.227,0.26]]
@@ -113,6 +115,12 @@ class Humedad(cprv1.SqlDb):
         self.colores_random=['#1487B9','#8ABB73',' #22467F',' #C7D15D',' #004D56',' #3CB371']
 
         self.best_color=['#C7D15D','#3CB371', '#22467F']
+        
+        self.local_server = info.LOCAL
+        self.remote_server1 = info.REMOTE
+        self.remote_server2 = info.REMOTE_h
+        self.codigo = codigo
+        
     @property
     def info(self):
         query = "SELECT * FROM %s WHERE clase = 'H' and codigo='%s'"%(self.local_table,self.codigo)
@@ -130,7 +138,7 @@ class Humedad(cprv1.SqlDb):
         query = "SELECT * FROM %s WHERE clase ='H'"%(self.local_table)
         return self.read_sql(query).set_index('codigo')
     
-    def read_humedad(self,start,end,rutacredentials_remote,rutacredentials_local):
+    def read_humedad(self,start,end,server):
         '''
         Read soil moisture data from SIATA server - SAL
         
@@ -138,37 +146,15 @@ class Humedad(cprv1.SqlDb):
         ---------
         pd.DataFrame
         '''
-        #se cambian de credenciales para consultar en remoto.
-        
-        #lectura de credenciales.
-        with open(rutacredentials_remote) as json_file:  
-            remotecredentials = json.load(json_file)
-        with open(rutacredentials_local) as json_file:  
-            localcredentials = json.load(json_file)
-        #cambio
-        self.table  = remotecredentials['table']
-        self.host   = remotecredentials['host']
-        self.user   = remotecredentials['user']
-        self.passwd = remotecredentials['passwd']
-        self.dbname = remotecredentials['dbname']
-        self.port   = remotecredentials['port']
-        
-        s = self.read_sql("select fecha_hora, h1, h2, h3, c1, c2, c3, t1, t2, t3, vw1, vw2, vw3 from humedad_rasp where cliente = '%s' and fecha_hora between '%s' and '%s'"%(self.codigo,start,end)).set_index('fecha_hora')
+        start,end =  pd.to_datetime(start),pd.to_datetime(end)
+        s = cprv1.SqlDb(**server).read_sql("select fecha_hora, h1, h2, h3, c1, c2, c3, t1, t2, t3, vw1, vw2, vw3 from humedad_rasp where cliente = '%s' and fecha_hora between '%s' and '%s'"%(self.codigo,start,end)).set_index('fecha_hora')
         s = s.loc[s.index.dropna()]
         s[s<0.0] = np.NaN
         s=s.reindex(pd.date_range(start.strftime('%Y-%m-%d %H:%M'),end.strftime('%Y-%m-%d %H:%M'),freq='1T'))
         
-        #se retorna a las credenciales del local.
-        self.table  = localcredentials['table']
-        self.host   = localcredentials['host']
-        self.user   = localcredentials['user']
-        self.passwd = localcredentials['passwd']
-        self.dbname = localcredentials['dbname']
-        self.port   = localcredentials['port']
-        
         return s
     
-    def plot_Humedad2Webpage(self,start,end,pluvio_s,ruta_figs,rutacredentials_remote,rutacredentials_local):
+    def plot_Humedad2Webpage(self,start,end,pluvio_s,ruta_figs):#,rutacredentials_remote,rutacredentials_local)
         '''
         Execute the operational plots of the SIATA soil moisture network within the official webpage format,
         colors, legends, time windows, etc. Use self.read_humedad() and plot_HydrologicalVar() functions for DB querys
@@ -179,7 +165,7 @@ class Humedad(cprv1.SqlDb):
         Any returns besides the plots.
         '''
         # Consulta SAL - Humedad
-        soilm_df=self.read_humedad(start,end,rutacredentials_remote,rutacredentials_local)
+        soilm_df=self.read_humedad(start,end,self.remote_server1)
 
         # Se escoge info y graficas de acuerdo al tipo de sensor.
         if self.info.get('tipo_sensor') == 1:
@@ -206,7 +192,7 @@ class Humedad(cprv1.SqlDb):
             #cant. de datos qe llegan sobre los esperados
             perc_datos= round((dfaxs[0].dropna().shape[0]/float(dfaxs[0].shape[0]))*100,2)
             bottomtext= 'Esta estación tiene tres sensores a 0.1, 0.5 y 0.9 metros\nde profundidad. Cada uno mide Contenido Volumétrico\nde Agua (CVA), Temperatura (T) y Conductividad Eléctri-\nca (CE) del suelo. También cuenta con una estación plu-\nviométrica asociada.\n \nTipo de Sensor: '+tiposensor+'\nResolución Temporal: 1 min. \nPorcentaje de datos transmitidos*: '+str(perc_datos)+u'% \n *Calidad de datos aun sin verificar exhaustivamente.'
-            rutafig=ruta_figs+str(int((end-start).total_seconds()/3600))+'_hours/'+str(self.info.get('codigo'))+'_'+str(self.info.get('nombre'))#+'.png'
+            rutafig=ruta_figs+str(int((end-start).total_seconds()/3600))+'_hours/'+str(self.info.get('codigo'))
             namesfig=['EC','T','VW']
             rutafigs= [rutafig+'_'+namefig+'.png' for namefig in namesfig]
             for index,dfax in enumerate(dfaxs):
@@ -237,6 +223,6 @@ class Humedad(cprv1.SqlDb):
             #cant. de datos qe llegan sobre los esperados
             perc_datos= round((dfax.dropna().shape[0]/float(dfax.shape[0]))*100,2)
             bottomtext= 'Esta estación tiene tres sensores a 0.1, 0.5 y 0.9 metros\nde profundidad que miden el Contenido Volumétrico de\nAgua (CVA) en el suelo, también cuenta con una esta\nción pluviométrica asociada.\n \nTipo de Sensores: '+tiposensor+'\nResolución Temporal: 1 min. \nPorcentaje de datos transmitidos*: '+str(perc_datos)+'% \n *Calidad de datos aun sin verificar exhaustivamente.'
-            rutafig=ruta_figs+str(int((end-start).total_seconds()/3600))+'_hours/'+str(self.info.get('codigo'))+'_'+str(self.info.get('nombre'))+'_H.png'
+            rutafig=ruta_figs+str(int((end-start).total_seconds()/3600))+'_hours/'+str(self.info.get('codigo'))+'_H.png'
             plot_HydrologicalVar(dfax,dfax2,ylabelax,ylabelax2,xlabel,fontsizeylabel,fontsizexlabel,
                                      path_fuentes,colors,window,bottomtext,ylocfactor_texts,yloc_legends,rutafig,title=title)

@@ -96,12 +96,12 @@ HIDRAULICA = {
 	'pic_path'					: u'Ruta de las imágenes',
 	'user'						: u'Usuario que modifica',
 			}
-# argumentos por defecto para class SqlDb servidor local
-LOCAL = {
-	'host'  					:"localhost",
-	'dbname'					:"cpr",
-	'port'  					: 3306
-                }
+# # argumentos por defecto para class SqlDb servidor local
+# LOCAL = {
+# 	'host'  					:"localhost",
+# 	'dbname'					:"cpr",
+# 	'port'  					: 3306
+#                 }
 # argumentos por defecto para class SqlDb servidor de siata
 REMOTE = {
 	'host'  					: "192.168.1.74",
@@ -111,7 +111,6 @@ REMOTE = {
 	'dbname'					:"siata",
 	'port'  					: 3306
 			}
-
 
 REDES = [
         'nivel', 'mocoa-nivel', 'Pluviografica', 'velocidad_superficial_rio',
@@ -143,3 +142,25 @@ x_sensor = [ 8.0,4.23,11.66,3.5,17.0,5.75,12.6,3.08,3.0,24.0,4.2,0.8,4.2,1.3,12.
             1.55,8.21,2.5,3.0,2.0,8.0,5.5,14.0,2.0,1.5,29.8,3.92,2.42,4.4,5.0,5.74,3.18 ]
 
 X_SENSOR = dict(zip(codigos,x_sensor))
+
+######################################################################SORA
+# argumentos por defecto para class SqlDb servidor de siata
+
+REMOTE_h= {
+	'host'  					: "192.168.1.100",
+	'user'  					:"siata_Consulta",
+	'passwd'					:"si@t@64512_C0nsult4",
+	'table' 					: 'estaciones',
+	'dbname'					:"siata",
+	'port'  					: 3306
+			}
+
+# argumentos por defecto para class SqlDb servidor local
+LOCAL = {
+	'host'  					:"localhost",
+	'user'  					:"sora",
+	'passwd'					:"12345",
+	'table' 					:'estaciones_estaciones',
+	'dbname'					:"cpr",
+	'port'  					: 3306 
+}
