@@ -562,7 +562,7 @@ class Nivel(SqlDb,wmf.SimuBasin):
         return data
 
     def last_topo(self):
-        fk_id = self.read_sql("SELECT id,fecha from myusers_item where item_fk_id = '%s'"%self.info.id).sort_values('fecha').loc[0,'id']
+        fk_id = self.read_sql("SELECT id,fecha from myusers_item where item_fk_id = '%s' and tipo_salida = 'siata-batimetria'"%self.info.id).sort_values('fecha').loc[0,'id']
         last_bat = self.read_sql('SELECT * FROM myusers_topo where fk_id = "%s"'%fk_id)
         return last_bat
 

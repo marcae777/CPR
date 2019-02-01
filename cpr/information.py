@@ -141,3 +141,4 @@ GEOPARAMETERS = {
 #RADAR_PATH = '/media/nicolas/Home/nicolas/101_RadarClass/'
 RADAR_PATH = '/home/mcano/dev/cprweb/src/media/101_RadarClass/'
 DATA_PATH  = '/home/mcano/dev/cprweb/src/media/'
+REFLECTIVIDAD_PATH = '/home/mcano/storage/radar/'
