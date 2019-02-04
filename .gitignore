@@ -76,3 +76,12 @@ documentacion/redrio_backup.ipynb
 documentacion/semanal-Copy3.ipynb
 documentacion/semanal-Copy4.ipynb
 crones/NombreDelProceso.lck
+pip-selfcheck.json
+
+bin/
+cpr/__pycache__/
+include/
+lib/
+migration/Untitled.ipynb
+migration/data_transfer.ipynb
+pip-selfcheck.json
