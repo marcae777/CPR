@@ -107,7 +107,7 @@ LOCAL = {
             }
 # argumentos por defecto para class SqlDb servidor de siata
 REMOTE = {
-    'host'                      : "192.168.1.74",
+    'host'                      : "localhost",
     'user'                      :"siata_Consulta",
     'passwd'                    :"si@t@64512_C0nsult4",
     'table'                     : 'estaciones',
@@ -140,5 +140,5 @@ GEOPARAMETERS = {
 #DATA_PATH  = '/media/nicolas/maso/Mario/'
 #RADAR_PATH = '/media/nicolas/Home/nicolas/101_RadarClass/'
 RADAR_PATH = '/home/mcano/dev/cprweb/src/media/101_RadarClass/'
-DATA_PATH  = '/home/mcano/dev/cprweb/src/media/'
+DATA_PATH = '/home/mcano/dev/backup/cprweb/src/media/'
 REFLECTIVIDAD_PATH = '/home/mcano/storage/radar/'
