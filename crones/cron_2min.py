@@ -37,7 +37,7 @@ def reportes():
     except:
         print('no se genera reporte de nivel')
     print('insertando datos de siata a local')
-    self.insert_myusers_hydrodata(df.resample('5min').max())
+    self.insert_hydro_hydrodata(df.resample('5min').max())
     print('generando reporte de lluvia')
     self.mean_rain_report(start,end,level=df.iloc[-3:].max())
 
