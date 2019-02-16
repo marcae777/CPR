@@ -1,9 +1,4 @@
-#!/usr/bin/env python
-# -*- coding: utf-8 -*-
-#
-#  CRP.py
-#
-#  Copyright 2018 MCANO <mario.cano@siata.gov.co>
+
 ESTACIONES = {
     u'codigo'                   : [u'Código','Codigo'],
     u'nombre'                   : [u'Nombre','NombreEstacion',],
@@ -96,24 +91,6 @@ HIDRAULICA = {
     'pic_path'                  : u'Ruta de las imágenes',
     'user'                      : u'Usuario que modifica',
             }
-# argumentos por defecto para class SqlDb servidor local
-LOCAL = {
-    'host'                      : "localhost",
-    'user'                      : "sample_user",
-    'passwd'                    : "s@mple_p@ss",
-    'table'                     : 'estaciones',
-    'dbname'                    : "cpr",
-    'port'                      : 3306
-            }
-# argumentos por defecto para class SqlDb servidor de siata
-REMOTE = {
-    'host'                      : "localhost",
-    'user'                      :"siata_Consulta",
-    'passwd'                    :"si@t@64512_C0nsult4",
-    'table'                     : 'estaciones',
-    'dbname'                    :"siata",
-    'port'                      : 3306
-            }
 
 REDES = [
         'nivel', 'mocoa-nivel', 'Pluviografica', 'velocidad_superficial_rio',
@@ -136,9 +113,3 @@ GEOPARAMETERS = {
                 'Pend_Cuenca [%]'         : u'pend_cuenca',
                 'Perimetro[km]'           : u'perimetro'
                 }
-
-#DATA_PATH  = '/media/nicolas/maso/Mario/'
-#RADAR_PATH = '/media/nicolas/Home/nicolas/101_RadarClass/'
-RADAR_PATH = '/home/mcano/dev/cprweb/src/media/101_RadarClass/'
-DATA_PATH = '/home/mcano/dev/backup/cprweb/src/media/'
-REFLECTIVIDAD_PATH = '/home/mcano/storage/radar/'

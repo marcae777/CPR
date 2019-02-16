@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import os
 import datetime
-import cpr.information as info
+import cpr.Information as info
 from cpr.SqlDb import SqlDb
 import logging
 from functools import wraps

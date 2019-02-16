@@ -1,18 +1,24 @@
-import pandas as pd
-import numpy as np
-import os
-import datetime
-import cpr.information as info
-from cpr.SqlDb import SqlDb
-import logging
-from functools import wraps
-import time
-import math
 import MySQLdb
+import os
+from cpr_v1.SqlDb import SqlDb
 
-passwd = input('root password:')
-self = SqlDb('cpr','root','localhost',passwd,3306)
-# create users, siata_Consulta is a read only user in siata database
+passwd = "mcanoYw2E#"
+database = 'hidrologia'
+
+
+
+try:
+    self = SqlDb(database,'root','localhost',passwd,3306)
+    self.read_sql('show databases')
+except MySQLdb.OperationalError:
+    self = SqlDb('','root','localhost',passwd,3306)
+try:
+    self.execute_sql("CREATE DATABASE %s CHARACTER SET UTF8;"%database)
+except MySQLdb.ProgrammingError:
+    pass
+if database in self.read_sql("show databases;").Database.values:
+    pass
+filepath = os.getcwd()+'tablas_siata.sql'
 if 'siata_Consulta' in self.read_sql("SELECT user FROM mysql.user;")['user'].values:
     print('user already created')
 else:
@@ -32,7 +38,7 @@ if flag in ['yes','y','si']:
     self.execute_sql("ALTER TABLE  hydro_hydrodata ADD UNIQUE (fk_id,fecha);")
     print('INFO: constraint added')
     self.dbname = 'siata'
-    for line in open('tablas_siata.sql'):
+    for line in open(filepath):
         try:
             self.execute_sql(line)
             print('INFO: TABLE CREATED')

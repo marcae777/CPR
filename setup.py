@@ -3,12 +3,12 @@ import os
 from numpy.distutils.core import setup, Extension
 
 setup(
-    name='cpr',
+    name='cpr_v1',
     version='1.0.0',
     author='Hidrologia SIATA',
     author_email='hidrosiata@gmail.com',
-    packages=['cpr'],
-    package_data={'cpr':['Nivel.py','SqlDb.py','static.py','information.py','Basin.py']},
+    packages=['cpr_v1'],
+    package_data={'cpr_v1':['WaterLevel','SqlDb.py','settings.py','Basin.py','static.py']},
     url='https://github.com/SIATAhidro/CPR.git',
     license='LICENSE.txt',
     description='Consultas-Plots y Reportes',
