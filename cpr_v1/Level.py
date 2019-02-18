@@ -138,7 +138,7 @@ class Level(HydroDb):
             df = pd.DataFrame(index = pd.date_range(self.start,self.end,freq='1min'),columns = codigos)
             for codigo in codigos:
                 try:
-                    df[codigo] = self.level(**kwargs)
+                    df[codigo] = Level(codigo=codigo).level(**kwargs)
                 except:
                     pass
             return df
