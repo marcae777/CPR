@@ -8,7 +8,7 @@ setup(
     author='Hidrologia SIATA',
     author_email='hidrosiata@gmail.com',
     packages=['cpr_v1'],
-    package_data={'cpr_v1':['WaterLevel','SqlDb.py','settings.py','Basin.py','static.py']},
+    package_data={'cpr_v1':['Level','SqlDb.py','settings.py','static.py']},
     url='https://github.com/SIATAhidro/CPR.git',
     license='LICENSE.txt',
     description='Consultas-Plots y Reportes',
