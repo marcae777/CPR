@@ -2,7 +2,6 @@ import MySQLdb
 import os
 from cpr_v1.SqlDb import SiataDb
 import cpr_v1.settings as info
-from cpr_v1 import Basin
 from cpr_v1.Level import Level
 import pandas as pd
 import numpy as np
@@ -35,4 +34,4 @@ for i in range(0,len(index)):
         df_split.index = pd.to_datetime(df_split.index)
         local.insert_data_from_df(df_split,'profundidad')
     except IndexError:
-        print('error')
+        pass
