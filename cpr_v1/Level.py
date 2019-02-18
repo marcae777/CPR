@@ -8,20 +8,20 @@ import pandas as pd
 import numpy as np
 import os
 import datetime
-import cpr_v1.information as info
-from cpr_v1.SqlDb import SqlDb
+import cpr_v1.settings as info
+from cpr_v1.SqlDb import SqlDb,SiataDb,HydroDb
 import logging
 from functools import wraps
 import time
 import math
 
-class LevelSensor(SqlDb):
+class Level(HydroDb):
     ''' Provide functions to manipulate data related to a level sensor and its basin '''
 
     local_table  = 'meta_estaciones'
     remote_table = 'estaciones'
 
-    def __init__(self,user,passwd,codigo = None,remote_server = info.REMOTE,**kwargs):
+    def __init__(self,codigo = None,start=None,end=None,**kwargs):
         '''
         The instance inherits modules to manipulate SQL
         Parameters
@@ -30,11 +30,13 @@ class LevelSensor(SqlDb):
         remote_server : keys to remote server
         local_server  : database kwargs to pass into the Sqldb class
         '''
-        self.remote_server  = remote_server
-
-        if not kwargs:
-            kwargs = info.LOCAL
-        SqlDb.__init__(self,codigo=codigo,user=user,passwd=passwd,**kwargs)
+        SqlDb.__init__(self,codigo=codigo,**info.LOCAL)
+        if start is None:
+            self.end   = datetime.datetime.now()
+            self.start = self.end - datetime.timedelta(hours=3)
+        else:
+            self.start = pd.to_datetime(start)
+            self.end   = pd.to_datetime(end)
 
     def __repr__(self):
         '''string to recreate the object'''
@@ -67,7 +69,7 @@ class LevelSensor(SqlDb):
         query = "SELECT * FROM %s WHERE clase ='Nivel'"%(self.local_table)
         return self.read_sql(query).set_index('codigo')
 
-    def sensor(self,start,end,**kwargs):
+    def sensor(self,**kwargs):
         '''
         Reads remote sensor level data
         Parameters
@@ -78,11 +80,11 @@ class LevelSensor(SqlDb):
         ----------
         pandas time series
         '''
-        sql = SqlDb(codigo = self.codigo,**self.remote_server)
-        s = read_data_from_annoying_siata_date_format(self,['pr','NI'][self.info.tipo_sensor],start,end,**kwargs)
+        siata_obj = SiataDb(codigo=self.codigo,**info.REMOTE)
+        s = siata_obj.read_fecha_hora_format(['pr','NI'][self.info.tipo_sensor],self.start,self.end,**kwargs)
         return s
 
-    def level(self,start=None,end=None,codigos=None,hours=3,local=False,**kwargs):
+    def level(self,codigos=None,hours=3,local=False,**kwargs):
         '''
         Reads remote level data
         Parameters
@@ -94,31 +96,25 @@ class LevelSensor(SqlDb):
         ----------
         pandas DataFrame with datetime index and basin radar fields
         '''
-        if start:
-            start = pd.to_datetime(start)
-            end   = pd.to_datetime(end)
-        else:
-            end = self.round_time()
-            start = end - datetime.timedelta(hours = hours)
         if local:
             if codigos:
-                return self.level_all(start,end,codigos,local=local)
+                return self.level_all(codigos,local=local)
             else:
-                format = (self.info.id,start.strftime(self.date_format),end.strftime(self.date_format))
+                format = (self.info.id,self.start.strftime(self.date_format),self.end.strftime(self.date_format))
                 query = "SELECT fecha,profundidad FROM hydro_hydrodata where fk_id = '%s' and fecha between '%s' and '%s'"%format
                 return self.read_sql(query).set_index('fecha')['profundidad']
         else:
             calidad = kwargs.get('calidad',True)
             if codigos:
-                return self.level_all(start,end,codigos,calidad=calidad)
+                return self.level_all(codigos,calidad=calidad)
             else:
-                s = self.sensor(start,end,calidad=calidad)
+                s = self.sensor(calidad=calidad)
                 serie = self.info.offset - s
                 serie[serie>=self.info.offset_old] = np.NaN
                 serie[serie<=0.0] = np.NaN
                 return serie
 
-    def level_all(self,start=None,end = None,codigos=None,hours=3,local=False,**kwargs):
+    def level_all(self,codigos=None,hours=3,local=False,**kwargs):
         '''
         Reads level from several stations
         Parameters
@@ -128,28 +124,21 @@ class LevelSensor(SqlDb):
         ----------
         last topo-batimetry in db, DataFrame
         '''
-        if start:
-            start = pd.to_datetime(start)
-            end   = pd.to_datetime(end)
-        else:
-            end = self.round_time()
-            start = end - datetime.timedelta(hours = hours)
         if codigos is None:
             codigos = self.infost.index
         if local:
             fields = 'meta_estaciones.codigo,hydro_hydrodata.fecha,hydro_hydrodata.profundidad'
             join = 'meta_estaciones ON hydro_hydrodata.fk_id = meta_estaciones.id'
-            format = (fields,join,start.strftime(self.date_format),end.strftime(self.date_format))
+            format = (fields,join,self.start.strftime(self.date_format),self.end.strftime(self.date_format))
             query = "SELECT %s FROM hydro_hydrodata INNER JOIN %s WHERE hydro_hydrodata.fecha between '%s' and '%s' "%format
             df = self.read_sql(query).set_index(['codigo','fecha']).unstack(0)['profundidad']
             return df[codigos]
         else:
-            start = self.round_time(pd.to_dateti/me(start))
-            df = pd.DataFrame(index = pd.date_range(start,end,freq='1min'),columns = codigos)
+            self.start = self.round_time(pd.to_datetime(self.start))
+            df = pd.DataFrame(index = pd.date_range(self.start,self.end,freq='1min'),columns = codigos)
             for codigo in codigos:
                 try:
-                    level = Nivel(codigo=codigo,** info.LOCAL).level(start,end,**kwargs)
-                    df[codigo] = level
+                    df[codigo] = self.level(**kwargs)
                 except:
                     pass
             return df
@@ -183,7 +172,7 @@ class LevelSensor(SqlDb):
         last topo-batimetry in db, DataFrame
         '''
         query = "select n1,n2,n3,n4 from meta_estaciones where codigo = '%s'"%self.codigo
-        return tuple(self.read_sql(query).values[0])
+        return np.array(self.read_sql(query).values[0],float)
 
 
     def series_to_risk(self,level,risk_levels=None):
@@ -223,7 +212,7 @@ class LevelSensor(SqlDb):
             output[codigo] = self.series_to_risk(df[codigo],risk_levels=risk_levels)
         return output
 
-    def update_level_local(self,start,end):
+    def update_level_local(self):
         '''
         Gets last topo-batimetry in db
         Parameters
@@ -235,12 +224,12 @@ class LevelSensor(SqlDb):
         '''
         self.table = 'hydro_hydrodata'
         try:
-            s = self.sensor(start,end).resample('5min').mean()
+            s = self.sensor().resample('5min').mean()
             self.update_series(s,'nivel')
         except:
             print ('WARNING: No data for %s'%self.codigo)
 
-    def update_level_local_all(self,start,end):
+    def update_level_local_all(self):
         '''
         Gets last topo-batimetry in db
         Parameters
@@ -250,16 +239,14 @@ class LevelSensor(SqlDb):
         ----------
         last topo-batimetry in db, DataFrame
         '''
-        start,end = pd.to_datetime(start),pd.to_datetime(end)
         timer = datetime.datetime.now()
         size = self.infost.index.size
         for count,codigo in enumerate(self.infost.index):
-            obj = Nivel(codigo = codigo,SimuBasin=False,**info.LOCAL)
-            obj.table = 'hydro_hydrodata'
-            obj.update_level_local(start,end)
+            self.table = 'hydro_hydrodata'
+            self.update_level_local()
         seconds = (datetime.datetime.now()-timer).seconds
 
-    def calidad(self):
+    def data_quality(self):
         '''
         Gets last topo-batimetry in db
         Parameters
@@ -269,9 +256,7 @@ class LevelSensor(SqlDb):
         ----------
         last topo-batimetry in db, DataFrame
         '''
-        end = datetime.datetime.now()
-        start = end - datetime.timedelta(days=7)
-        df = self.read_sql("select fecha,nivel,codigo from hydro_hydrodata where fecha between '%s' and '%s'"%(start.strftime('%Y-%m-%d %H:%M'),end.strftime('%Y-%m-%d %H:%M')))
+        df = self.read_sql("select fecha,nivel,codigo from hydro_hydrodata where fecha between '%s' and '%s'"%(self.start.strftime('%Y-%m-%d %H:%M'),end.strftime('%Y-%m-%d %H:%M')))
         now = datetime.datetime.now()
         s = pd.DataFrame(df.loc[df.nivel.notnull()].groupby('codigo')['fecha'].max().sort_values())
         s['nombre'] = self.infost.loc[s.index,'nombre']
@@ -280,47 +265,3 @@ class LevelSensor(SqlDb):
             r = s['fecha']<(now-datetime.timedelta(hours=horas))
             s.loc[s[r].index,'rango']=valor
         return s.dropna()
-
-    def siata_remote_data_to_transfer(start,end,*args,**kwargs):
-        '''
-        Parameters
-        ----------
-        start        : initial date
-        end          : final date
-        Returns
-        ----------
-        pandas DataFrame
-        '''
-        remote = cpr.Nivel(**cpr.info.REMOTE)
-        codigos_str = '('+str(list(self.infost.index)).strip('[]')+')'
-        parameters = tuple([codigos_str,self.fecha_hora_query(start,end)])
-        df = remote.read_sql('SELECT * FROM datos WHERE cliente in %s and %s'%parameters)
-        return df
-
-    def data_to_transfer(self,start,end,local_path=None,remote_path=None,**kwargs):
-        '''
-        Gets pandas Series with data from tables with
-        bad data
-        Parameters
-        ----------
-        field        : Sql table field name
-        start        : initial date
-        end          : final date
-        Returns
-        ----------
-        pandas time Series
-        '''
-        transfer = self.siata_remote_data_to_transfer(start,end,**kwargs)
-        def convert(x):
-            try:
-                value = pd.to_datetime(x).strftime('%Y-%m-%d')
-            except:
-                value = np.NaN
-            return value
-        transfer['fecha'] = transfer['fecha'].apply(lambda x:convert(x))
-        transfer = transfer.loc[transfer['fecha'].dropna().index]
-        if local_path:
-            transfer.to_csv(local_path)
-            if remote_path:
-                os.system('scp %s %s'%(local_path,remote_path))
-        return transfer

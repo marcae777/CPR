@@ -6,31 +6,22 @@
 #  Copyright 2018 MCANO <mario.cano@siata.gov.co>
 
 # argumentos por defecto para class SqlDb servidor local
-AMAZONAS = {
+import os
+# READ ONLY
+LOCAL = {
     'host'                      : "localhost",
-    'user'                      : "sample_user",
-    'passwd'                    : "s@mple_p@ss",
-    'table'                     : 'estaciones',
-    'dbname'                    : "cpr",
+    'user'                      : "root",
+    'passwd'                    : "mcanoYw2E#",
+    'table'                     : 'meta_estaciones',
+    'dbname'                    : "hidrologia",
     'port'                      : 3306
             }
-
-DEVELOPMENT = {
+REMOTE = {
     'host'                      : "localhost",
-    'user'                      : "sample_user",
-    'passwd'                    : "s@mple_p@ss",
+    'user'                      : "root",
+    'passwd'                    : "mcanoYw2E#",
     'table'                     : 'estaciones',
-    'dbname'                    : "cpr",
-    'port'                      : 3306
-            }
-
-# argumentos por defecto para class SqlDb servidor de siata
-SIATA = {
-    'host'                      : "localhost",
-    'user'                      :"siata_Consulta",
-    'passwd'                    :"si@t@64512_C0nsult4",
-    'table'                     : 'estaciones',
-    'dbname'                    :"siata",
+    'dbname'                    : "siata",
     'port'                      : 3306
             }
 

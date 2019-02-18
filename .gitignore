@@ -85,3 +85,5 @@ lib/
 migration/Untitled.ipynb
 migration/data_transfer.ipynb
 pip-selfcheck.json
+sql_log.log
+__pycache__
