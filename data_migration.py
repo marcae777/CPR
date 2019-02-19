@@ -6,6 +6,7 @@ from cpr_v1.Level import Level
 import pandas as pd
 import numpy as np
 import datetime
+import os
 
 codigo = 93
 local = Level(codigo=codigo,**info.LOCAL)
@@ -13,6 +14,8 @@ remote = SiataDb(codigo=codigo)
 local_filepath = info.DATA_PATH + 'data_migration/sample_data_remote.csv'
 remote_filepath = info.DATA_PATH + 'data_migration/sample_data_local.csv'
 now = local.round_time(datetime.datetime.now())
+
+print(remote.execute_sql("delete from datos"))
 
 for filepath in [local_filepath,remote_filepath]:
     df = pd.read_csv(filepath,index_col=0)
