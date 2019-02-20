@@ -11,7 +11,7 @@ import os
 LOCAL = {
     'host'                      : "localhost",
     'user'                      : "root",
-    'passwd'                    : "mcanoYw2E#",
+    'passwd'                    : "root",
     'table'                     : 'meta_estaciones',
     'dbname'                    : "hidrologia",
     'port'                      : 3306
@@ -19,12 +19,10 @@ LOCAL = {
 REMOTE = {
     'host'                      : "localhost",
     'user'                      : "root",
-    'passwd'                    : "mcanoYw2E#",
+    'passwd'                    : "root",
     'table'                     : 'estaciones',
     'dbname'                    : "siata",
     'port'                      : 3306
             }
 
-RADAR_PATH = '/home/mcano/dev/cprweb/src/media/101_RadarClass/'
-DATA_PATH = '/home/mcano/dev/backup/cprweb/src/media/'
-REFLECTIVIDAD_PATH = '/home/mcano/storage/radar/'
+DATA_PATH = ''
