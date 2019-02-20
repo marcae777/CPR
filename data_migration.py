@@ -11,30 +11,22 @@ import os
 codigo = 93
 local = Level(codigo=codigo,**info.LOCAL)
 remote = SiataDb(codigo=codigo)
-local_filepath = info.DATA_PATH + 'data_migration/sample_data_remote.csv'
-remote_filepath = info.DATA_PATH + 'data_migration/sample_data_local.csv'
 now = local.round_time(datetime.datetime.now())
+remote.execute_sql("delete from datos")
+df = pd.read_csv('sample_data_siata.csv',index_col=0)
+offset = now - pd.to_datetime('2018-03-25 14:00:00')
+fechas, horas = [],[]
+for fecha,hora in zip(df['fecha'],df['hora']):
+    fecha = pd.to_datetime(fecha)
+    hora  = pd.to_timedelta(hora)
+    fecha_hora = (fecha + hora)+offset
+    fechas.append(fecha_hora.strftime('%Y-%m-%d'))
+    horas.append(fecha_hora.strftime('%H:%M:00'))
 
-print(remote.execute_sql("delete from datos"))
-
-for filepath in [local_filepath,remote_filepath]:
-    df = pd.read_csv(filepath,index_col=0)
-    df.index = pd.to_datetime(df.index)
-    df.index = df.index + (now - (df.index[-1]-datetime.timedelta(hours=12)))
-    df.to_csv(filepath)
-
-remote.insert_in_datos(local_filepath)
-df = pd.read_csv(remote_filepath,index_col=0)
-df.index = pd.to_datetime(df.index)
-df.index = df.index + (now - (df.index[-1]-datetime.timedelta(hours=12)))
-N = 5
-index = np.array(np.linspace(0,df.index.size,N),int)
-
-for i in range(0,len(index)):
-    try:
-        df_split = df.iloc[index[i]:index[i+1]].resample('5min').max()
-        df_split.columns = np.array(df_split.columns,int)
-        df_split.index = pd.to_datetime(df_split.index)
-        local.insert_data_from_df(df_split,'profundidad')
-    except IndexError:
-        pass
+df['fecha'] = fechas
+df['hora'] = pd.to_timedelta(horas)
+filepath = 'data_to_update.csv'
+df.to_csv(filepath)
+remote.execute_sql("delete from datos")
+remote.insert_in_datos(filepath)
+os.system('rm data_to_update.csv')
