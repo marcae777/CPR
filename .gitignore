@@ -88,3 +88,4 @@ migration/data_transfer.ipynb
 pip-selfcheck.json
 sql_log.log
 __pycache__
+cpr_v1/settings.py.save
