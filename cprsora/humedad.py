@@ -1,3 +1,6 @@
+#!/usr/bin/env python
+# -*- coding: utf-8 -*-
+
 import numpy as np
 import pandas as pd
 import pylab as pl
@@ -11,8 +14,8 @@ import information as info
 
 
 import sys
-reload(sys)
-sys.setdefaultencoding("utf-8")
+# reload(sys)
+# sys.setdefaultencoding("utf-8")
 
 def plot_HydrologicalVar(dfax,dfax2,ylabelax,ylabelax2,xlabel,fontsizeylabel,fontsizexlabel,
                          path_fuentes,colors,window,bottomtext,ylocfactor_texts,yloc_legends,rutafig=None,
@@ -55,7 +58,7 @@ def plot_HydrologicalVar(dfax,dfax2,ylabelax,ylabelax2,xlabel,fontsizeylabel,fon
     axAX=pl.gca()
     ax2=ax.twinx()
     ax2AX=pl.gca()
-    dfax2.plot(ax=ax2,alpha=0.5,color=colors[-1])
+    dfax2.plot(ax=ax2,alpha=0.5,color=[colors[-1],colors[-1]])
     
     ax2.set_ylim(0,ax2AX.get_ylim()[1]*2.5)
     ax2AX.set_ylim(ax2AX.get_ylim() [::-1]) 
@@ -121,12 +124,29 @@ class Humedad(cprv1.SqlDb):
         self.remote_server2 = info.REMOTE_h
         self.codigo = codigo
         
+#     @property
+#     def info_remote(self):
+#         query = "SELECT * FROM %s WHERE red = 'humedad' and codigo='%s'"%(self.remote_table,self.codigo)
+#         s = cprv1.SqlDb(**self.remote_server1).read_sql(query).T
+#         return s[s.columns[0]]
+    
     @property
     def info(self):
         query = "SELECT * FROM %s WHERE clase = 'H' and codigo='%s'"%(self.local_table,self.codigo)
         s = self.read_sql(query).T
         return s[s.columns[0]]
 
+#     @property
+#     def infost_remote(self):
+#         '''
+#         Gets full information from all stations
+#         Returns
+#         ---------
+#         pd.DataFrame
+#         '''
+#         query = "SELECT * FROM %s WHERE red ='humedad'"%(self.remote_table)
+#         return cprv1.SqlDb(**self.remote_server1).read_sql(query).set_index('Codigo')
+    
     @property
     def infost(self):
         '''
@@ -137,6 +157,17 @@ class Humedad(cprv1.SqlDb):
         '''
         query = "SELECT * FROM %s WHERE clase ='H'"%(self.local_table)
         return self.read_sql(query).set_index('codigo')
+
+    def update_sql(self,table,field,value,pk):
+        query = "update %s set %s = %s where id = %s"%(table,field,value,pk)
+        self.execute_sql(query)
+        
+    def update_estado(self,codigo):
+        table = 'estaciones_estaciones'
+        field = 'estado'
+        value = "'"+cpr.SqlDb(**self.remote_server1).read_sql("select estado from estaciones where codigo = '%s'"%(codigo)).values[0][0]+"'"
+        pk = self.infost.id.loc[codigo]
+        self.update_sql(table,field,value,pk)
     
     def read_humedad(self,start,end,server):
         '''
@@ -147,7 +178,7 @@ class Humedad(cprv1.SqlDb):
         pd.DataFrame
         '''
         start,end =  pd.to_datetime(start),pd.to_datetime(end)
-        s = cprv1.SqlDb(**server).read_sql("select fecha_hora, h1, h2, h3, c1, c2, c3, t1, t2, t3, vw1, vw2, vw3 from humedad_rasp where cliente = '%s' and fecha_hora between '%s' and '%s'"%(self.codigo,start,end)).set_index('fecha_hora')
+        s = cprv1.SqlDb(**server).read_sql("select fecha_hora, h1, h2, h3, c1, c2, c3, t1, t2, t3, vw1, vw2, vw3,calidad,source from humedad_rasp where cliente = '%s' and fecha_hora between '%s' and '%s'"%(self.codigo,start,end)).set_index('fecha_hora')
         s = s.loc[s.index.dropna()]
         s[s<0.0] = np.NaN
         s=s.reindex(pd.date_range(start.strftime('%Y-%m-%d %H:%M'),end.strftime('%Y-%m-%d %H:%M'),freq='1T'))
@@ -169,11 +200,11 @@ class Humedad(cprv1.SqlDb):
 
         # Se escoge info y graficas de acuerdo al tipo de sensor.
         if self.info.get('tipo_sensor') == 1:
-            soilm_df=soilm_df[soilm_df.columns[3:]]
+            soilm_df=soilm_df[soilm_df.columns[3:-2]]
             tiposensor='Digitales'
             soilm_df.columns=['Sensor CE 1','Sensor CE 2','Sensor CE 3','Sensor T 1','Sensor T 2','Sensor T 3','Sensor CVA 1','Sensor CVA 2','Sensor CVA 3']
             #Set df
-            soilm_df['Precipitacion']=pluvio_s
+            soilm_df[['p1','p2']]=pluvio_s[['p1','p2']]
             #plot
             yloc_legends=[-0.34,-0.39,-0.46]
             ylocfactor_texts=[0.88,0.925,0.98]    
@@ -204,7 +235,7 @@ class Humedad(cprv1.SqlDb):
             tiposensor='Análogos'
             soilm_df.columns=['Sensor CVA 1','Sensor CVA 2','Sensor CVA 3']
             #Set df
-            soilm_df['Precipitacion']=pluvio_s
+            soilm_df[['p1','p2']]=pluvio_s[['p1','p2']]
             #plot
             yloc_legends=[-0.34,-0.395,-0.455]
             ylocfactor_texts=[0.83,0.88,0.94]
