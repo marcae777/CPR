@@ -257,3 +257,21 @@ class Humedad(cprv1.SqlDb):
             rutafig=ruta_figs+str(int((end-start).total_seconds()/3600))+'_hours/'+str(self.info.get('codigo'))+'_H.png'
             plot_HydrologicalVar(dfax,dfax2,ylabelax,ylabelax2,xlabel,fontsizeylabel,fontsizexlabel,
                                      path_fuentes,colors,window,bottomtext,ylocfactor_texts,yloc_legends,rutafig,title=title)
+            
+### cron
+def plot_HNetwork(nivel):
+    queryH=nivel.read_sql('select codigo from estaciones_estaciones where clase="H"')
+    codes=np.array(queryH['codigo'])
+    ruta_figs='/media/nicolas/Home/Jupyter/Soraya/Op_Alarmas/Result_to_web/figs_operacionales/'
+    for code in codes:
+        self= hm.Humedad(codigo=code)
+        end = dt.datetime.now()
+        end = pd.to_datetime(end.strftime('%Y-%m-%d %H:%M'))
+        starts  = [(end - pd.Timedelta(hours=3)), (end - pd.Timedelta(hours=24)),
+                   (end - pd.Timedelta(hours=72)),(end - pd.Timedelta(days=30)) ]
+        for start in starts:
+            #consulta pluvio
+            pluvio_s = cprv1.SqlDb(**self.remote_server1).read_sql("select p1/1000,p2/1000 from datos where cliente='%s' and (((fecha>'%s') or (fecha='%s' and hora>='%s')) and ((fecha<'%s') or (fecha='%s' and hora<='%s')))"%(int(self.info.get('pluvios')),start.strftime('%Y-%m-%d'),start.strftime('%Y-%m-%d'),start.strftime('%H:%M:%S'),end.strftime('%Y-%m-%d'),end.strftime('%Y-%m-%d'),end.strftime('%H:%M:%S')))
+            pluvio_s.columns= ['p1','p2']
+            self.plot_Humedad2Webpage(start,end,pluvio_s,ruta_figs)
+    print 'Se ejecutan las graficas operacionales de la red de humedad'
