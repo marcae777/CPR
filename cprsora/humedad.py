@@ -47,7 +47,7 @@ def plot_HydrologicalVar(dfax,dfax2,ylabelax,ylabelax2,xlabel,fontsizeylabel,fon
     #figure
     fig  =pl.figure(dpi=120,facecolor='w')
     ax = fig.add_subplot(111)
-    dfax.plot(ax=ax,lw=1.85,color=colors[:-1])
+    dfax.plot(ax=ax,lw=1.85,color=colors[:-2])
     pl.yticks(fontproperties=fonttype)
     pl.xticks(fontproperties=fonttype)
     ax.set_ylabel(ylabelax,fontproperties=fonttype,fontsize=fontsizeylabel)
@@ -58,9 +58,9 @@ def plot_HydrologicalVar(dfax,dfax2,ylabelax,ylabelax2,xlabel,fontsizeylabel,fon
     axAX=pl.gca()
     ax2=ax.twinx()
     ax2AX=pl.gca()
-    dfax2.plot(ax=ax2,alpha=0.5,color=[colors[-1],colors[-1]])
+    dfax2.plot(ax=ax2,alpha=0.5,color=[colors[-2],colors[-1]])
     
-    ax2.set_ylim(0,ax2AX.get_ylim()[1]*2.5)
+    ax2.set_ylim(0,ax2AX.get_ylim()[1]*4.5)
     ax2AX.set_ylim(ax2AX.get_ylim() [::-1]) 
     ax2.set_ylabel(ylabelax2,fontproperties=fonttype,fontsize=fontsizeylabel)
     pl.yticks(fontproperties=fonttype)
@@ -78,6 +78,7 @@ def plot_HydrologicalVar(dfax,dfax2,ylabelax,ylabelax2,xlabel,fontsizeylabel,fon
             ylocfactor_text = ylocfactor_texts[2]
         #legend
         ax.legend(loc=(0.15,yloc_legend),ncol=2,prop=legendfont)
+        ax2.legend(loc=(0.325,yloc_legend*1.2655),ncol=2,prop=legendfont)
         #se ubica el text, x e y que se ajustan de acuerdo a los dominios de x e y
         ax.text(dfax.index[int(dfax.shape[0]*0.083)], ax.get_ylim()[0]-(1*(ax.get_ylim()[1]-ax.get_ylim()[0])*ylocfactor_text),
                 bottomtext, fontsize=11.5, fontproperties=fonttype,
@@ -113,7 +114,7 @@ class Humedad(cprv1.SqlDb):
                                   [0.0156,0.486,0.556],[0.007,0.32,0.36],[0.0078,0.227,0.26]]
         self.colores_siata2 = ['#1487B9', '#22467F','#09202E','#004D56',\
                               '#70AFBA','#98D1DD','#8ABB73','#C7D15D']
-        self.colores_siata_sora=['#008d8d','#3CB371']
+        self.colores_siata_sora=['#008d8d','#3CB371', '#4392d6'] #'#4995d2']
         
         self.colores_random=['#1487B9','#8ABB73',' #22467F',' #C7D15D',' #004D56',' #3CB371']
 
@@ -165,7 +166,7 @@ class Humedad(cprv1.SqlDb):
     def update_estado(self,codigo):
         table = 'estaciones_estaciones'
         field = 'estado'
-        value = "'"+cpr.SqlDb(**self.remote_server1).read_sql("select estado from estaciones where codigo = '%s'"%(codigo)).values[0][0]+"'"
+        value = "'"+cprv1.SqlDb(**self.remote_server1).read_sql("select estado from estaciones where codigo = '%s'"%(codigo)).values[0][0]+"'"
         pk = self.infost.id.loc[codigo]
         self.update_sql(table,field,value,pk)
     
@@ -180,37 +181,60 @@ class Humedad(cprv1.SqlDb):
         start,end =  pd.to_datetime(start),pd.to_datetime(end)
         s = cprv1.SqlDb(**server).read_sql("select fecha_hora, h1, h2, h3, c1, c2, c3, t1, t2, t3, vw1, vw2, vw3,calidad,source from humedad_rasp where cliente = '%s' and fecha_hora between '%s' and '%s'"%(self.codigo,start,end)).set_index('fecha_hora')
         s = s.loc[s.index.dropna()]
-        s[s<0.0] = np.NaN
+        s[s<=0.0] = np.NaN
         s=s.reindex(pd.date_range(start.strftime('%Y-%m-%d %H:%M'),end.strftime('%Y-%m-%d %H:%M'),freq='1T'))
         
         return s
     
-    def plot_Humedad2Webpage(self,start,end,pluvio_s,ruta_figs):#,rutacredentials_remote,rutacredentials_local)
+    def plot_Humedad2Webpage(self,start,end,pluvio_s,ruta_figs=None,drop_depth=None):#,rutacredentials_remote,rutacredentials_local)
         '''
         Execute the operational plots of the SIATA soil moisture network within the official webpage format,
         colors, legends, time windows, etc. Use self.read_humedad() and plot_HydrologicalVar() functions for DB querys
         and plotting.
-        
+
         Returns
         ---------
         Any returns besides the plots.
         '''
         # Consulta SAL - Humedad
         soilm_df=self.read_humedad(start,end,self.remote_server1)
+        # hacer nan lo que no sea calidad == 1
+        soilm_df[soilm_df['calidad']==152.0]= np.nan
 
         # Se escoge info y graficas de acuerdo al tipo de sensor.
         if self.info.get('tipo_sensor') == 1:
+
             soilm_df=soilm_df[soilm_df.columns[3:-2]]
             tiposensor='Digitales'
             soilm_df.columns=['Sensor CE 1','Sensor CE 2','Sensor CE 3','Sensor T 1','Sensor T 2','Sensor T 3','Sensor CVA 1','Sensor CVA 2','Sensor CVA 3']
             #Set df
             soilm_df[['p1','p2']]=pluvio_s[['p1','p2']]
             #plot
-            yloc_legends=[-0.34,-0.39,-0.46]
-            ylocfactor_texts=[0.88,0.925,0.98]    
+            yloc_legends=[-0.35,-0.39,-0.46]
+            ylocfactor_texts=[0.97,1.02,1.10] #[0.88,0.925,0.98]    
             title=str(self.info.get('codigo'))+' | '+self.info.get('nombre')
-            dfaxs=[soilm_df[soilm_df.columns[:3]],soilm_df[soilm_df.columns[3:6]],soilm_df[soilm_df.columns[6:9]]]
-            dfax2=soilm_df[soilm_df.columns[-1]]
+            #dfaxs=[soilm_df[soilm_df.columns[:3]],soilm_df[soilm_df.columns[3:6]],soilm_df[soilm_df.columns[6:9]]]
+            #             dfax2=soilm_df[soilm_df.columns[-1]]
+            depths = np.array([key.split(' ')[2] for key in soilm_df.columns[:-2]])
+            if drop_depth is not None:
+                pos_depthsout=[]
+                for depth in drop_depth:
+                    pos_depthsout.append(np.where(depths == depth)[0] )
+                pos_depthsout = np.sort(np.concatenate(pos_depthsout))
+
+                # redef del df sin detphs out.
+                soilm_df = soilm_df.drop(soilm_df.columns[pos_depthsout],axis=1)
+            else:
+                pass
+
+            # definicion de combos de columnas por variable medida por el sensor.
+            var_s = np.array([key.split(' ')[1] for key in soilm_df.columns[:-2]])
+            dfaxs = []
+            dfaxs.append(soilm_df[soilm_df.columns[np.where(var_s=='CE')]])
+            dfaxs.append(soilm_df[soilm_df.columns[np.where(var_s=='T')]])
+            dfaxs.append(soilm_df[soilm_df.columns[np.where(var_s=='CVA')]])
+
+            dfax2=soilm_df[soilm_df.columns[-2:]]
             ylabelaxs=['Conductividad Eléctrica   $(dS.m^{-1})$', u'Temperatura ($^\circ$C)','Cont. Volumétrico de  Agua $(\%)$']
             ylabelax2='Precipitación  ($mm$)'
             xlabel='Tiempo'
@@ -219,18 +243,25 @@ class Humedad(cprv1.SqlDb):
             path_fuentes='/media/nicolas/Home/Jupyter/Sebastian/AvenirLTStd-Book/AvenirLTStd-Book.otf'
             window=str(int((end-start).total_seconds()/3600))+' hours'
             loc2legend=None
-            colors=[self.colores_siata_sora[1],self.colores_siata_sora[0],self.colores_siata2[2],self.colores_siata2[4]]
+            colors=[self.colores_siata_sora[1],self.colores_siata_sora[0],self.colores_siata2[2],self.colores_siata_sora[2],self.colores_siata2[4]]
             #cant. de datos qe llegan sobre los esperados
             perc_datos= round((dfaxs[0].dropna().shape[0]/float(dfaxs[0].shape[0]))*100,2)
             bottomtext= 'Esta estación tiene tres sensores a 0.1, 0.5 y 0.9 metros\nde profundidad. Cada uno mide Contenido Volumétrico\nde Agua (CVA), Temperatura (T) y Conductividad Eléctri-\nca (CE) del suelo. También cuenta con una estación plu-\nviométrica asociada.\n \nTipo de Sensor: '+tiposensor+'\nResolución Temporal: 1 min. \nPorcentaje de datos transmitidos*: '+str(perc_datos)+u'% \n *Calidad de datos aun sin verificar exhaustivamente.'
-            rutafig=ruta_figs+str(int((end-start).total_seconds()/3600))+'_hours/'+str(self.info.get('codigo'))
             namesfig=['EC','T','VW']
-            rutafigs= [rutafig+'_'+namefig+'.png' for namefig in namesfig]
-            for index,dfax in enumerate(dfaxs):
-                plot_HydrologicalVar(dfax,dfax2,ylabelaxs[index],ylabelax2,xlabel,fontsizeylabel,fontsizexlabel,
-                            path_fuentes,colors,window,bottomtext,ylocfactor_texts,yloc_legends,rutafigs[index],title=title)
+            if ruta_figs is not None:
+                rutafig=ruta_figs+str(int((end-start).total_seconds()/3600))+'_hours/'+str(self.info.get('codigo'))
+                rutafigs= [rutafig+'_'+namefig+'.png' for namefig in namesfig]
+                for index,dfax in enumerate(dfaxs):
+                    plot_HydrologicalVar(dfax,dfax2,ylabelaxs[index],ylabelax2,xlabel,fontsizeylabel,fontsizexlabel,
+                    path_fuentes,colors,window,bottomtext,ylocfactor_texts,yloc_legends,
+                    rutafig=rutafigs[index],title=title)
+            else:
+                for index,dfax in enumerate(dfaxs):
+                    plot_HydrologicalVar(dfax,dfax2,ylabelaxs[index],ylabelax2,xlabel,fontsizeylabel,fontsizexlabel,
+                    path_fuentes,colors,window,bottomtext,ylocfactor_texts,yloc_legends,title=title)
 
-        else:
+        if self.info.get('tipo_sensor') == 0:
+
             soilm_df=soilm_df[soilm_df.columns[:3]]
             tiposensor='Análogos'
             soilm_df.columns=['Sensor CVA 1','Sensor CVA 2','Sensor CVA 3']
@@ -238,10 +269,11 @@ class Humedad(cprv1.SqlDb):
             soilm_df[['p1','p2']]=pluvio_s[['p1','p2']]
             #plot
             yloc_legends=[-0.34,-0.395,-0.455]
-            ylocfactor_texts=[0.83,0.88,0.94]
+            ylocfactor_texts=[0.91,0.97,1.05] #[0.83,0.88,0.94]
             title=str(self.info.get('codigo'))+' | '+self.info.get('nombre')
-            dfax=soilm_df[soilm_df.columns[:-1]]
-            dfax2=soilm_df[soilm_df.columns[-1]]
+            dfax=soilm_df[soilm_df.columns[:-2]]
+        #             dfax2=soilm_df[soilm_df.columns[-1]]
+            dfax2=soilm_df[soilm_df.columns[-2:]]
             ylabelax='Cont. Volumétrico de  Agua $(\%)$'
             ylabelax2='Precipitación  ($mm$)'
             xlabel='Tiempo'
@@ -250,14 +282,19 @@ class Humedad(cprv1.SqlDb):
             path_fuentes='/media/nicolas/Home/Jupyter/Sebastian/AvenirLTStd-Book/AvenirLTStd-Book.otf'
             window=str(int((end-start).total_seconds()/3600))+' hours'
             loc2legend=None
-            colors=[self.colores_siata_sora[1],self.colores_siata_sora[0],self.colores_siata2[2],self.colores_siata2[4]]
+            colors=[self.colores_siata_sora[1],self.colores_siata_sora[0],self.colores_siata2[2],self.colores_siata_sora[2],self.colores_siata2[4]]
             #cant. de datos qe llegan sobre los esperados
             perc_datos= round((dfax.dropna().shape[0]/float(dfax.shape[0]))*100,2)
             bottomtext= 'Esta estación tiene tres sensores a 0.1, 0.5 y 0.9 metros\nde profundidad que miden el Contenido Volumétrico de\nAgua (CVA) en el suelo, también cuenta con una esta\nción pluviométrica asociada.\n \nTipo de Sensores: '+tiposensor+'\nResolución Temporal: 1 min. \nPorcentaje de datos transmitidos*: '+str(perc_datos)+'% \n *Calidad de datos aun sin verificar exhaustivamente.'
-            rutafig=ruta_figs+str(int((end-start).total_seconds()/3600))+'_hours/'+str(self.info.get('codigo'))+'_H.png'
-            plot_HydrologicalVar(dfax,dfax2,ylabelax,ylabelax2,xlabel,fontsizeylabel,fontsizexlabel,
-                                     path_fuentes,colors,window,bottomtext,ylocfactor_texts,yloc_legends,rutafig,title=title)
-            
+            if ruta_figs is not None:
+                rutafig=ruta_figs+str(int((end-start).total_seconds()/3600))+'_hours/'+str(self.info.get('codigo'))+'_H.png'
+                plot_HydrologicalVar(dfax,dfax2,ylabelax,ylabelax2,xlabel,fontsizeylabel,fontsizexlabel,
+                                     path_fuentes,colors,window,bottomtext,ylocfactor_texts,yloc_legends,
+                                     rutafig=rutafig,title=title)
+            else:
+                plot_HydrologicalVar(dfax,dfax2,ylabelax,ylabelax2,xlabel,fontsizeylabel,fontsizexlabel,
+                                     path_fuentes,colors,window,bottomtext,ylocfactor_texts,yloc_legends,
+                                     title=title)
 ### cron
 def plot_HNetwork(nivel):
     queryH=nivel.read_sql('select codigo from estaciones_estaciones where clase="H"')
