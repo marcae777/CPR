@@ -199,7 +199,7 @@ class Humedad(cprv1.SqlDb):
         # Consulta SAL - Humedad
         soilm_df=self.read_humedad(start,end,self.remote_server1)
         # hacer nan lo que no sea calidad == 1
-        soilm_df[soilm_df['calidad']==152.0]= np.nan
+        soilm_df[soilm_df['calidad']==151.0]= np.nan
 
         # Se escoge info y graficas de acuerdo al tipo de sensor.
         if self.info.get('tipo_sensor') == 1:
